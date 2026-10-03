@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>入退室｜みんなのサブスク</title>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+  :root{
+    --paper:#EEF4FA; --grid:#D6E3F1; --ink:#1B2B4B; --sub:#5A6B89;
+    --in:#169B6B; --out:#E9861C; --err:#C93C3C;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;
+    color:var(--ink);
+    background-color:var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px,transparent 1px),
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:28px 28px;
+    -webkit-user-select:none;user-select:none;
+  }
+  .wrap{height:100%;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:4vw;align-items:center;padding:4vh 5vw}
+  @media (orientation:portrait){.wrap{grid-template-columns:1fr;grid-template-rows:auto auto;align-content:center;gap:4vh}}
+  .cam{position:relative;aspect-ratio:1/1;width:100%;max-height:82vh;margin:auto;border-radius:36px;overflow:hidden;background:#0d1626;box-shadow:0 0 0 10px #fff}
+  video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+  .frame{position:absolute;inset:16%;pointer-events:none}
+  .frame i{position:absolute;width:22%;height:22%;border:7px solid #fff;opacity:.9}
+  .frame i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0;border-radius:18px 0 0 0}
+  .frame i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0;border-radius:0 18px 0 0}
+  .frame i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0;border-radius:0 0 0 18px}
+  .frame i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0;border-radius:0 0 18px 0}
+  .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+  .flash.on{animation:flash .45s ease-out}
+  @keyframes flash{from{opacity:.95}to{opacity:0}}
+  .side{text-align:left}
+  .clock{font-size:clamp(56px,11vw,140px);font-weight:900;letter-spacing:.02em;line-height:1}
+  .date{font-size:clamp(18px,2.4vw,30px);color:var(--sub);margin-top:1vh;font-weight:700}
+  .guide{margin-top:5vh;font-size:clamp(24px,3.6vw,46px);font-weight:900;line-height:1.35}
+  .guide small{display:block;font-size:.5em;font-weight:700;color:var(--sub);margin-top:1.2vh}
+  .brand{position:fixed;left:5vw;bottom:2.5vh;font-weight:700;color:var(--sub);font-size:clamp(14px,1.6vw,20px)}
+
+  /* 結果画面 */
+  .overlay{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding:5vh 6vw}
+  .overlay.show{display:flex}
+  .overlay.in{background:var(--in)} .overlay.out{background:var(--out)} .overlay.err{background:var(--err)}
+  .overlay.wait{background:rgba(27,43,75,.88)}
+  .overlay .msg{font-size:clamp(28px,5vw,64px);font-weight:900}
+  .overlay .name{font-size:clamp(56px,11vw,150px);font-weight:900;line-height:1.15;margin:2vh 0;word-break:keep-all}
+  .overlay .meta{font-size:clamp(22px,3.4vw,44px);font-weight:700;opacity:.95}
+  .overlay .note{font-size:clamp(14px,1.8vw,22px);margin-top:3vh;opacity:.9}
+  .overlay.show .name{animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes pop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+  .count{width:clamp(90px,14vw,170px);aspect-ratio:1;border-radius:50%;border:10px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin 1s linear infinite;margin-bottom:3vh}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .start{position:fixed;inset:0;background:var(--ink);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3vh;text-align:center;padding:6vw}
+  .start h1{font-size:clamp(28px,4.5vw,56px);font-weight:900}
+  .start button{font:inherit;font-size:clamp(22px,3vw,36px);font-weight:900;color:var(--ink);background:#fff;border:0;border-radius:999px;padding:2.4vh 6vw;cursor:pointer}
+  .start button:focus-visible{outline:4px solid #8fc1ff;outline-offset:4px}
+  .start p{color:#c9d4e6;font-size:clamp(14px,1.8vw,20px);line-height:1.7;max-width:40em}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cam">
+    <video id="video" playsinline muted autoplay></video>
+    <div class="frame"><i></i><i></i><i></i><i></i></div>
+    <div class="flash" id="flash"></div>
+  </div>
+  <div class="side">
+    <div class="clock" id="clock">--:--</div>
+    <div class="date" id="date"></div>
+    <div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div>
+  </div>
+</div>
+<div class="brand">みんなのサブスク</div>
+
+<div class="overlay" id="overlay">
+  <div class="count" id="spinner" hidden></div>
+  <div class="msg" id="oMsg"></div>
+  <div class="name" id="oName"></div>
+  <div class="meta" id="oMeta"></div>
+  <div class="note" id="oNote"></div>
+</div>
+
+<div class="start" id="start">
+  <h1>入退室受付</h1>
+  <button id="startBtn">受付をはじめる</button>
+  <p id="startNote">ボタンを押すとカメラが起動します。カメラの使用を確認されたら「許可」を選んでください。</p>
+</div>
+
+<script>
+  // Google側（記録・LINE通知）の窓口
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbwoPiOpPmUcykIrgUGYj5f0z1jnPA6gH3cU2aUDsqSLVKlAB9CytbtpYb8iqHAS81kQ-g/exec';
+  // 教室専用の鍵は URL の「#k=…」で受け取る（ページ本体には書かない）
+  var KEY = (location.hash.match(/k=([0-9a-f]+)/) || [])[1] || '';
+  try {
+    if (KEY) localStorage.setItem('subsc_key', KEY); else KEY = localStorage.getItem('subsc_key') || '';
+  } catch(e){}
+  if (!KEY) {
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('startNote').textContent = 'このURLでは受付できません。管理者から渡された専用のURLで開いてください。';
+  }
+  var video = document.getElementById('video');
+  var work = document.createElement('canvas');
+  var detector = null, busy = false, lastText = '', lastTime = 0, wakeLock = null;
+
+  // 時計
+  var WD = ['日','月','火','水','木','金','土'];
+  function tick(){
+    var d = new Date();
+    document.getElementById('clock').textContent = d.getHours() + ':' + ('0'+d.getMinutes()).slice(-2);
+    document.getElementById('date').textContent = (d.getMonth()+1) + '月' + d.getDate() + '日（' + WD[d.getDay()] + '）';
+  }
+  tick(); setInterval(tick, 5000);
+
+  document.getElementById('startBtn').onclick = start;
+
+  function start(){
+    var note = document.getElementById('startNote');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      note.textContent = 'このブラウザではカメラを使えません。AndroidのChromeで開いてください。';
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} }, audio:false })
+      .then(function(stream){
+        video.srcObject = stream;
+        return video.play();
+      })
+      .then(function(){
+        document.getElementById('start').style.display = 'none';
+        try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(function(){}); } catch(e){}
+        keepAwake();
+        if ('BarcodeDetector' in window) {
+          try { detector = new BarcodeDetector({ formats:['qr_code'] }); } catch(e){ detector = null; }
+        }
+        scanLoop();
+      })
+      .catch(function(err){
+        note.textContent = 'カメラを起動できませんでした（' + err.name + '）。Chromeのサイト設定でカメラを「許可」にして、ページを開き直してください。';
+      });
+  }
+
+  function keepAwake(){
+    try {
+      if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(function(l){ wakeLock = l; }).catch(function(){});
+    } catch(e){}
+  }
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') keepAwake(); });
+
+  function scanLoop(){
+    if (busy || video.readyState < 2) { setTimeout(scanLoop, 250); return; }
+    if (detector) {
+      detector.detect(video).then(function(codes){
+        if (codes && codes.length) onCode(codes[0].rawValue);
+      }).catch(function(){ detector = null; }).then(function(){ setTimeout(scanLoop, 200); });
+    } else {
+      var w = 480, h = Math.round(video.videoHeight * w / video.videoWidth) || 360;
+      work.width = w; work.height = h;
+      var ctx = work.getContext('2d', { willReadFrequently:true });
+      ctx.drawImage(video, 0, 0, w, h);
+      var img = ctx.getImageData(0, 0, w, h);
+      var code = window.jsQR ? jsQR(img.data, w, h, { inversionAttempts:'dontInvert' }) : null;
+      if (code && code.data) onCode(code.data);
+      setTimeout(scanLoop, 200);
+    }
+  }
+
+  function onCode(text){
+    if (busy) return;
+    var now = Date.now();
+    if (text === lastText && now - lastTime < 6000) return;
+    lastText = text; lastTime = now;
+    if (text.indexOf('SUBSC:') !== 0) {
+      busy = true; beep(220, .25);
+      show('err', 'このQRコードは使えません', '', '教室のカードをかざしてね', '');
+      setTimeout(reset, 2500);
+      return;
+    }
+    busy = true; beep(880, .12);
+    show('wait', 'そのまま カメラを見てね', '', '', '', true);
+    setTimeout(function(){
+      var photo = capture();
+      document.getElementById('oMsg').textContent = '送信中…';
+      fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'checkin', key:KEY, qr:text, photo:photo }) })
+        .then(function(r){ return r.json(); })
+        .then(result)
+        .catch(function(){
+          beep(220, .3);
+          show('err', '通信できませんでした', '', 'もう一度かざしてください', '');
+          lastText = '';
+          setTimeout(reset, 3000);
+        });
+    }, 1400);
+  }
+
+  function capture(){
+    var vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw) return '';
+    var w = 720, h = Math.round(vh * w / vw);
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.translate(w, 0); ctx.scale(-1, 1); // 画面と同じ向き（鏡像）で保存
+    ctx.drawImage(video, 0, 0, w, h);
+    var f = document.getElementById('flash');
+    f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
+    return c.toDataURL('image/jpeg', 0.78);
+  }
+
+  function result(r){
+    if (!r || !r.ok) {
+      beep(220, .3);
+      show('err', (r && r.message) || 'エラーが起きました', '', '先生に声をかけてください', '');
+    } else if (r.duplicate) {
+      beep(660, .15);
+      show(r.action === '入室' ? 'in' : 'out', 'もう受付ずみです', r.name + 'さん', r.action + 'は記録されています', '');
+    } else if (r.action === '入室') {
+      chime(true);
+      show('in', 'ようこそ！', r.name + 'さん', '入室 ' + r.time, r.notifyFailed ? '※記録はできましたが、通知を送れませんでした' : 'おうちの人に知らせたよ');
+    } else {
+      chime(false);
+      show('out', 'おつかれさま！', r.name + 'さん', '退室 ' + r.time, r.notifyFailed ? '※記録はできましたが、通知を送れませんでした' : '気をつけて帰ってね');
+    }
+    setTimeout(reset, 3500);
+  }
+
+  function show(kind, msg, name, meta, note, spinning){
+    var o = document.getElementById('overlay');
+    o.className = 'overlay show ' + kind;
+    document.getElementById('spinner').hidden = !spinning;
+    document.getElementById('oMsg').textContent = msg;
+    document.getElementById('oName').textContent = name;
+    document.getElementById('oMeta').textContent = meta;
+    document.getElementById('oNote').textContent = note;
+  }
+  function reset(){
+    document.getElementById('overlay').className = 'overlay';
+    busy = false;
+  }
+
+  // 効果音
+  var actx = null;
+  function beep(freq, dur, delay){
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      var t = actx.currentTime + (delay || 0);
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(.3, t + .02);
+      g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + dur + .05);
+    } catch(e){}
+  }
+  function chime(isIn){
+    if (isIn) { beep(784, .18); beep(1047, .3, .16); }
+    else { beep(1047, .18); beep(784, .3, .16); }
+  }
+</script>
+</body>
+</html>
