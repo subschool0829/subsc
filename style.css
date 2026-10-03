@@ -46,3 +46,6 @@
   a:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
   footer{margin-top:40px;font-size:13px;color:var(--sub)}
   @media print{header{padding-top:0}.scroll{overflow:visible}table{min-width:0}h2{break-after:avoid}.box,.season,table{break-inside:avoid}}
+.cta{display:block;margin:24px 0;padding:18px 20px;border-radius:16px;background:var(--yellow);color:var(--ink);text-decoration:none;font-weight:900;font-size:20px;text-align:center;box-shadow:0 4px 0 var(--ink)}
+.cta span{display:block;font-size:13px;font-weight:700;margin-top:2px}
+.cta:active{transform:translateY(2px);box-shadow:0 2px 0 var(--ink)}
