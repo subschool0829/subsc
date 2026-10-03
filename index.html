@@ -207,7 +207,6 @@
     var c = document.createElement('canvas');
     c.width = w; c.height = h;
     var ctx = c.getContext('2d');
-    ctx.translate(w, 0); ctx.scale(-1, 1); // 画面と同じ向き（鏡像）で保存
     ctx.drawImage(video, 0, 0, w, h);
     var f = document.getElementById('flash');
     f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
