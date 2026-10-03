@@ -1,0 +1,48 @@
+:root{
+    --ink:#1A1A1A; --sub:#5E5E5E; --line:#E4E0D3; --yellow:#F7CE2E; --tint:#FFF5CC; --bg:#FFFFFF; --soft:#F7F6F2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;font-size:16px;font-weight:500}
+  .wrap{max-width:760px;margin:0 auto;padding:0 20px 64px}
+  header{padding:40px 0 28px;border-bottom:6px solid var(--yellow);margin-bottom:8px}
+  .brand{font-weight:900;font-size:15px;color:var(--sub)}
+  h1{font-size:clamp(30px,7vw,44px);font-weight:900;line-height:1.25;margin-top:6px}
+  .lead{color:var(--sub);font-size:14px;margin-top:10px}
+  h2{font-size:21px;font-weight:900;margin:44px 0 14px;padding-left:14px;border-left:8px solid var(--yellow);line-height:1.4}
+  h3{font-size:17px;font-weight:900;margin:24px 0 8px}
+  p{margin:8px 0}
+  .note{font-size:14px;color:var(--sub)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0}
+  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+  th,td{border-bottom:1px solid var(--line);padding:12px 10px;text-align:right;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  thead th{font-size:13px;color:var(--sub);font-weight:700;vertical-align:bottom;white-space:normal}
+  tbody td:first-child{font-weight:700}
+  td.price{font-size:20px;font-weight:900}
+  td.price small{font-size:12px;font-weight:700;margin-left:1px}
+  td.dim{color:var(--sub)}
+  @media (max-width:560px){th,td{padding:10px 4px}td.price{font-size:16px}td.price small{font-size:10px}tbody td:first-child{white-space:normal;font-size:14px}thead th{font-size:11px}}
+  td.kind,tbody td.kind:first-child{text-align:left;font-weight:500;color:var(--sub);font-size:14px;white-space:nowrap}
+  td[rowspan]{vertical-align:middle;border-bottom:1px solid var(--line)}
+  .tabs{display:flex;gap:8px;padding-top:20px}
+  .tabs a{padding:6px 16px;border-radius:999px;border:1.5px solid var(--ink);color:var(--ink);text-decoration:none;font-weight:700;font-size:14px}
+  .tabs a[aria-current]{background:var(--ink);color:#fff}
+  header{padding-top:24px}
+  .pill{display:inline-block;background:var(--tint);border-radius:999px;padding:1px 10px;font-size:12px;font-weight:700;color:var(--ink)}
+  .box{background:var(--soft);border-radius:14px;padding:18px 20px;margin:14px 0}
+  .box h3{margin-top:0}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:560px){.two{grid-template-columns:1fr}}
+  .season{background:var(--tint);border-radius:14px;padding:16px 18px}
+  .season b{font-size:22px;font-weight:900}
+  ul.plain{list-style:none}
+  ul.plain li{padding:10px 0;border-bottom:1px solid var(--line)}
+  ul.plain li:last-child{border-bottom:0}
+  ol.steps{list-style:none;counter-reset:s}
+  ol.steps li{counter-increment:s;display:flex;gap:12px;align-items:flex-start;padding:10px 0}
+  ol.steps li::before{content:counter(s);flex:none;width:30px;height:30px;border-radius:50%;background:var(--yellow);font-weight:900;display:grid;place-items:center;font-size:15px}
+  .contact{margin-top:48px;padding:22px 20px;border:2px solid var(--ink);border-radius:16px}
+  .contact a{color:var(--ink);font-weight:900}
+  a:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+  footer{margin-top:40px;font-size:13px;color:var(--sub)}
+  @media print{header{padding-top:0}.scroll{overflow:visible}table{min-width:0}h2{break-after:avoid}.box,.season,table{break-inside:avoid}}
