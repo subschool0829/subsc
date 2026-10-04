@@ -13,6 +13,7 @@
   :root{--ink:#1A1A1A;--sub:#5E5E5E;--line:#E4E0D3;--yellow:#F7CE2E;--tint:#FFF5CC;--soft:#F7F6F2;--bg:#fff;
     --shift:#FFF5CC;--lesson:#E3F1EA;--lessonInk:#0F6E56;--event:#E8EEF8;--eventInk:#28497A;--warn:#B3261E;--warnBg:#FCEBEB}
   *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
   body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;color:var(--ink);background:var(--soft);line-height:1.6;font-size:16px;font-weight:500;padding-bottom:84px}
   button,input,select,textarea{font:inherit;color:inherit}
   header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:4px solid var(--yellow);padding:10px 16px}
@@ -87,6 +88,14 @@
   .att{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
   .att:last-child{border-bottom:0}
   .on-badge{color:var(--lessonInk);font-weight:900}
+  .badge{display:inline-block;min-width:18px;border-radius:999px;background:var(--warn);color:#fff;font-size:11px;line-height:18px;padding:0 5px;margin-left:4px}
+  .slot{border-top:1px solid var(--line);margin-top:8px;padding-top:8px}
+  .info{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:4px;font-size:12px}
+  .info span{border-radius:6px;padding:1px 6px;background:var(--soft)}
+  .info .warn{display:inline-block;margin:0;padding:1px 6px}
+  .info .okk{background:var(--lesson);color:var(--lessonInk);font-weight:700}
+  .chipb{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:4px 10px;font-weight:700;cursor:pointer;font-size:13px;text-align:left}
+  .chipb small{display:block;font-weight:500;color:var(--sub);font-size:11px}
   :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 </style>
 </head>
@@ -107,6 +116,11 @@
       <button class="btn" id="todayBtn">今日</button>
     </div>
     <div id="days"></div>
+  </section>
+
+  <section class="panel" id="p-req">
+    <p class="muted">生徒・保護者は、公式LINEで「授業」と送ると届く専用ページから申し込みます。受付・変更依頼・却下の結果は、公式LINEで本人に届きます。</p>
+    <div id="reqList"><div class="loading">読み込み中…</div></div>
   </section>
 
   <section class="panel" id="p-events">
@@ -131,6 +145,7 @@
 
 <nav class="tabbar" id="tabbar" hidden>
   <button data-p="week" aria-current="page">週の予定</button>
+  <button data-p="req">依頼<span class="badge" id="reqBadge" hidden></span></button>
   <button data-p="events">行事</button>
   <button data-p="qr">出勤QR</button>
 </nav>
@@ -170,7 +185,7 @@
       document.getElementById('tabbar').hidden = false;
       document.getElementById('meName').textContent = r.me.name + 'さん' + (r.me.admin ? '（管理者）' : '');
       if (!document.querySelector('.panel.on')) showPanel('week');
-      renderWeek(); renderEvents(); renderQr();
+      renderWeek(); renderEvents(); renderQr(); loadReq();
     }).catch(function(e){
       if (e.auth || !D) {
         document.getElementById('boot').outerHTML = '<div class="msg"><b>' + esc(e.message) + '</b><p class="muted" style="margin-top:8px">管理者から受け取った専用のURLで開いてください。</p></div>';
@@ -439,6 +454,104 @@
       var st = !a || !a.used ? '<span class="muted">QR未使用</span>' : a.in ? '<span class="on-badge">出勤中（' + a.since + '〜）</span>' : a.since ? '<span class="muted">退勤（' + a.since + '）</span>' : '<span class="muted">未出勤</span>';
       return '<div class="att"><b>' + esc(m.name) + '</b>' + st + '</div>';
     }).join('');
+  }
+
+  // ===== 授業依頼 =====
+  var R = null;
+  function loadReq(){
+    return api('sch_req_load').then(function(r){ R = r; renderReq(); })
+      .catch(function(e){ document.getElementById('reqList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  function slotLine(s){ return label(s.date) + ' ' + s.start + '〜' + s.end; }
+  function mentorOpts(sel){ return D.mentors.map(function(m){ return '<option value="' + m.id + '"' + (m.id === sel ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join(''); }
+  function infoHtml(a){
+    var h = [];
+    if (a.past) h.push('<span class="warn">過ぎた日付です</span>');
+    h.push(a.covering.length ? '<span class="okk">在室：' + a.covering.map(function(m){ return esc(m.name); }).join('・') + '</span>' : '<span class="warn">在室予定のメンターなし</span>');
+    a.lessons.forEach(function(l){ h.push('<span>授業 ' + l.start + '〜 ' + esc(l.names) + '（' + l.count + '人・' + esc(l.mentor || '担当未定') + '）' + (l.joinable ? ' ← 追加できます' : '') + '</span>'); });
+    a.events.forEach(function(n){ h.push('<span class="warn">行事「' + esc(n) + '」</span>'); });
+    if (a.others.length) h.push('<span class="warn">同じ時間の依頼：' + a.others.map(esc).join('、') + '</span>');
+    return '<div class="info">' + h.join('') + '</div>';
+  }
+  function renderReq(){
+    var wait = R.requests.filter(function(r){ return r.status === '受付待ち'; });
+    var chg = R.requests.filter(function(r){ return r.status === '変更依頼中'; });
+    var badge = document.getElementById('reqBadge'); badge.hidden = !wait.length; badge.textContent = wait.length;
+    var html = '<h2>お返事待ち（' + wait.length + '）</h2>';
+    html += wait.length ? wait.map(function(r){
+      return '<div class="card"><div class="row"><b>' + esc(r.sname) + 'さん</b><span class="muted">' + esc(r.created.slice(5).replace('-', '/')) + (r.requester ? '　' + esc(r.requester) : '') + '</span></div>'
+        + (r.content ? '<div>内容：' + esc(r.content) + '</div>' : '') + (r.withWho ? '<div>一緒に：' + esc(r.withWho) + '</div>' : '') + (r.memo ? '<div class="muted">' + esc(r.memo) + '</div>' : '')
+        + r.slotInfo.map(function(a, i){ return '<div class="slot"><div class="row"><b>第' + (i+1) + '希望　' + slotLine(a) + '</b><button class="btn pri" data-acc="' + r.id + '" data-i="' + i + '">受付</button></div>' + infoHtml(a) + '</div>'; }).join('')
+        + '<div class="acts"><button class="btn" data-prop="' + r.id + '">変更依頼</button><button class="btn danger" data-rej="' + r.id + '">却下</button></div></div>';
+    }).join('') : '<div class="card muted">お返事待ちの依頼はありません</div>';
+    if (chg.length) {
+      html += '<h2>生徒の返事待ち（' + chg.length + '）</h2>' + chg.map(function(r){
+        return '<div class="card"><b>' + esc(r.sname) + 'さん</b><span class="muted">　日時を提案済み</span>'
+          + r.proposalInfo.map(function(a){ return '<div class="slot"><b>' + slotLine(a) + '</b>' + infoHtml(a) + '</div>'; }).join('')
+          + (r.message ? '<div class="muted" style="margin-top:6px">送った連絡：' + esc(r.message) + '</div>' : '')
+          + '<div class="acts"><button class="btn" data-prop="' + r.id + '">提案をやり直す</button><button class="btn danger" data-rej="' + r.id + '">却下</button></div></div>';
+      }).join('');
+    }
+    if (R.done.length) {
+      html += '<h2>最近の対応</h2>' + R.done.map(function(r){
+        return '<div class="card muted"><b>' + esc(r.sname) + 'さん</b>　' + esc(r.status) + (r.status === '確定' && r.mentor ? '（担当：' + esc(r.mentor) + '）' : '') + '<br>' + esc(r.updated) + '</div>';
+      }).join('');
+    }
+    document.getElementById('reqList').innerHTML = html;
+  }
+  document.getElementById('reqList').addEventListener('click', function(ev){
+    var b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.acc) return reqAccept(find(R.requests, b.dataset.acc), +b.dataset.i);
+    if (b.dataset.prop) return reqPropose(find(R.requests, b.dataset.prop));
+    if (b.dataset.rej) return reqReject(find(R.requests, b.dataset.rej));
+  });
+  function reqSave(action, data, msg, btn){
+    btn.disabled = true; btn.textContent = '送信中…';
+    return api(action, data).then(function(){ closeModal(); toast(msg); return load(); })
+      .catch(function(e){ toast(e.message); btn.disabled = false; btn.textContent = btn.dataset.label; });
+  }
+  function reqAccept(r, i){
+    var a = r.slotInfo[i];
+    var def = a.covering.length ? a.covering[0].id : D.me.id;
+    var joins = a.lessons.filter(function(l){ return l.joinable; });
+    openModal('<h3>受付：' + esc(r.sname) + 'さん</h3><p><b>' + slotLine(a) + '</b></p>' + infoHtml(a)
+      + '<label class="f">担当<select id="aM">' + mentorOpts(def) + '</select></label>'
+      + (joins.length ? '<label class="f">授業<select id="aJ"><option value="">新しい授業として入れる</option>' + joins.map(function(l){ return '<option value="' + l.id + '">' + esc(l.names) + 'の授業に追加（' + (l.count + 1) + '人で受講）</option>'; }).join('') + '</select></label>' : '')
+      + '<p class="muted" style="margin-top:12px">受付すると授業が登録され、生徒・保護者に公式LINEで確定のお知らせが届きます。</p>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="aOk" data-label="受付する">受付する</button></div></div>');
+    var js = document.getElementById('aJ');
+    if (js) js.onchange = function(){ var l = find(a.lessons, js.value); if (l && l.mentorId) document.getElementById('aM').value = l.mentorId; };
+    document.getElementById('aOk').onclick = function(){ reqSave('sch_req_accept', { id: r.id, index: i, mentorId: val('aM'), joinLessonId: js ? js.value : '' }, '受付しました', this); };
+  }
+  function reqPropose(r){
+    var near = R.freeSlots.slice(0, 24);
+    openModal('<h3>変更依頼：' + esc(r.sname) + 'さん</h3><p class="muted">別の日時を3つまで提案できます。生徒がLINEのリンクから選ぶと、その日時で確定します。</p>'
+      + (near.length ? '<div class="f" style="margin-top:10px;font-size:13px;font-weight:700;color:var(--sub)">空いている時間（タップで入力）</div><div class="chips" id="pFree">' + near.map(function(s, k){ return '<button type="button" class="chipb" data-k="' + k + '">' + label(s.date) + ' ' + s.start + '<small>' + esc(s.mentor) + '</small></button>'; }).join('') + '</div>'
+        : '<p class="muted" style="margin-top:8px">2週間以内に空いている時間が見つかりません。在室予定を入れると、ここに候補が出ます。</p>')
+      + [0,1,2].map(function(k){ return '<div class="two"><label class="f">提案' + (k+1) + '　日付<input type="date" id="pD' + k + '"></label><label class="f">開始<input type="time" id="pT' + k + '" step="300"></label></div>'; }).join('')
+      + '<label class="f">担当<select id="pM">' + mentorOpts(D.me.id) + '</select></label>'
+      + '<label class="f">生徒へのひとこと（任意）<textarea id="pMsg" maxlength="200" placeholder="例：その日は埋まっているので、こちらの日時はいかがですか？"></textarea></label>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="pOk" data-label="提案を送る">提案を送る</button></div></div>');
+    var fr = document.getElementById('pFree');
+    if (fr) fr.onclick = function(ev){
+      var b = ev.target.closest('button'); if (!b) return;
+      var s = near[+b.dataset.k];
+      for (var k = 0; k < 3; k++) {
+        if (!document.getElementById('pD' + k).value) { document.getElementById('pD' + k).value = s.date; document.getElementById('pT' + k).value = s.start; document.getElementById('pM').value = s.mentorId; return; }
+      }
+      toast('提案は3つまでです');
+    };
+    document.getElementById('pOk').onclick = function(){
+      var slots = [];
+      for (var k = 0; k < 3; k++) { var d = val('pD' + k), t = val('pT' + k); if (d && t) slots.push({ date: d, start: t }); }
+      if (!slots.length) { toast('日時を1つ以上入れてください'); return; }
+      reqSave('sch_req_propose', { id: r.id, slots: slots, mentorId: val('pM'), message: val('pMsg') }, '提案を送りました', this);
+    };
+  }
+  function reqReject(r){
+    openModal('<h3>却下：' + esc(r.sname) + 'さん</h3><label class="f">理由・ひとこと（任意。生徒に送られます）<textarea id="jMsg" maxlength="200" placeholder="例：その週は授業がいっぱいのため、別の週でお願いします。"></textarea></label>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn danger" id="jOk" data-label="却下する">却下する</button></div></div>');
+    document.getElementById('jOk').onclick = function(){ reqSave('sch_req_reject', { id: r.id, reason: val('jMsg') }, '却下しました', this); };
   }
 
   // ===== タブ =====
