@@ -217,6 +217,9 @@
     if (!r || !r.ok) {
       beep(220, .3);
       show('err', (r && r.message) || 'エラーが起きました', '', '先生に声をかけてください', '');
+    } else if (r.mentor && !r.duplicate) {
+      chime(r.kind === '出勤');
+      show(r.kind === '出勤' ? 'in' : 'out', r.kind === '出勤' ? '出勤しました' : 'おつかれさまでした', r.name + 'さん', r.kind + ' ' + r.time, r.kind === '出勤' ? 'よろしくお願いします' : '');
     } else if (r.duplicate) {
       beep(660, .15);
       show(r.action === '入室' ? 'in' : 'out', 'もう受付ずみです', r.name + 'さん', r.action + 'は記録されています', '');

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F7CE2E">
+<title>メンター｜みんなのサブスク</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{--ink:#1A1A1A;--sub:#5E5E5E;--line:#E4E0D3;--yellow:#F7CE2E;--tint:#FFF5CC;--soft:#F7F6F2;--bg:#fff;
+    --shift:#FFF5CC;--lesson:#E3F1EA;--lessonInk:#0F6E56;--event:#E8EEF8;--eventInk:#28497A;--warn:#B3261E;--warnBg:#FCEBEB}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;color:var(--ink);background:var(--soft);line-height:1.6;font-size:16px;font-weight:500;padding-bottom:84px}
+  button,input,select,textarea{font:inherit;color:inherit}
+  header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:4px solid var(--yellow);padding:10px 16px}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:760px;margin:0 auto}
+  .brand{font-weight:900;font-size:15px}
+  .me{font-size:13px;color:var(--sub)}
+  main{max-width:760px;margin:0 auto;padding:12px}
+  .weeknav{display:flex;align-items:center;gap:8px;margin:4px 0 12px}
+  .weeknav b{flex:1;text-align:center;font-weight:900}
+  .btn{border:1.5px solid var(--ink);background:var(--bg);border-radius:999px;padding:6px 14px;font-weight:700;cursor:pointer;font-size:14px}
+  .btn.pri{background:var(--ink);color:#fff}
+  .btn.yel{background:var(--yellow);border-color:var(--yellow)}
+  .btn.danger{border-color:var(--warn);color:var(--warn)}
+  .btn:disabled{opacity:.5}
+  .day{background:var(--bg);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+  .day.today{outline:3px solid var(--yellow)}
+  .dhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .dhead b{font-size:17px;font-weight:900}
+  .dhead .sun{color:#B3261E}.dhead .sat{color:#185FA5}
+  .add{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--ink);background:var(--bg);font-size:20px;font-weight:900;line-height:1;cursor:pointer}
+  .empty{color:var(--sub);font-size:13px}
+  .item{display:block;width:100%;text-align:left;border:0;border-radius:10px;padding:8px 10px;margin-top:6px;cursor:pointer}
+  .item .t{font-weight:900;font-variant-numeric:tabular-nums;margin-right:6px}
+  .item small{display:block;font-size:12px;opacity:.85}
+  .item.shift{background:var(--shift)}
+  .item.lesson{background:var(--lesson);color:var(--lessonInk)}
+  .item.lesson.cancel{background:var(--soft);color:var(--sub);text-decoration:line-through}
+  .item.event{background:var(--event);color:var(--eventInk)}
+  .item.event.off{background:var(--soft);color:var(--sub)}
+  .item.event.off .nm{text-decoration:line-through}
+  .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:0 8px;background:rgba(255,255,255,.7);margin-left:4px;text-decoration:none}
+  .warn{display:block;color:var(--warn);background:var(--warnBg);border-radius:6px;padding:2px 8px;margin-top:4px;font-size:12px;font-weight:700;text-decoration:none}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin-bottom:10px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+  nav.tabbar{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);display:flex;z-index:6;padding-bottom:env(safe-area-inset-bottom)}
+  nav.tabbar button{flex:1;border:0;background:none;padding:10px 0 12px;font-weight:700;font-size:13px;color:var(--sub);cursor:pointer}
+  nav.tabbar button[aria-current]{color:var(--ink);box-shadow:inset 0 4px 0 var(--yellow)}
+  .panel{display:none}.panel.on{display:block}
+  .card{background:var(--bg);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+  h2{font-size:18px;font-weight:900;margin:6px 0 10px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .muted{color:var(--sub);font-size:13px}
+  /* モーダル */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:20}
+  .modal.on{display:flex}
+  .sheet{background:var(--bg);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 18px 28px}
+  @media (min-width:600px){.modal{align-items:center}.sheet{border-radius:18px}}
+  .sheet h3{font-size:18px;font-weight:900;margin-bottom:10px}
+  label.f{display:block;margin-top:12px;font-size:13px;font-weight:700;color:var(--sub)}
+  .f input,.f select,.f textarea{display:block;width:100%;margin-top:4px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);font-size:16px}
+  .f textarea{min-height:64px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .acts{display:flex;gap:8px;justify-content:space-between;margin-top:18px;flex-wrap:wrap}
+  .acts .r{display:flex;gap:8px;margin-left:auto}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .chip{background:var(--lesson);color:var(--lessonInk);border-radius:999px;padding:2px 4px 2px 10px;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:2px}
+  .chip button{border:0;background:none;font-weight:900;padding:0 6px;cursor:pointer;color:inherit}
+  .picker{border:1.5px solid var(--line);border-radius:10px;max-height:200px;overflow:auto;margin-top:6px}
+  .picker button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:var(--bg);padding:9px 12px;cursor:pointer}
+  .picker button:last-child{border-bottom:0}
+  .picker .none{padding:9px 12px;color:var(--sub);font-size:13px}
+  .seg{display:flex;gap:6px;margin-top:6px}
+  .seg button{flex:1;border:1.5px solid var(--ink);border-radius:999px;background:var(--bg);padding:6px;font-weight:700;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+  .choice button{display:block;width:100%;margin-top:8px;padding:14px;border-radius:12px;border:0;font-weight:900;font-size:16px;cursor:pointer;text-align:left}
+  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:999px;padding:8px 18px;font-size:14px;font-weight:700;opacity:0;transition:opacity .2s;z-index:30;pointer-events:none}
+  .toast.on{opacity:1}
+  .loading{text-align:center;color:var(--sub);padding:40px 0}
+  .msg{background:var(--bg);border-radius:14px;padding:24px;text-align:center;margin-top:20px}
+  #qr{display:flex;justify-content:center;padding:16px;background:#fff}
+  #qr img,#qr canvas{width:min(70vw,260px)!important;height:auto!important}
+  .att{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+  .att:last-child{border-bottom:0}
+  .on-badge{color:var(--lessonInk);font-weight:900}
+  :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+</style>
+</head>
+<body>
+<header><div class="top"><div class="brand">みんなのサブスク　メンター</div><div class="me" id="meName"></div></div></header>
+
+<main>
+  <div id="boot" class="loading">読み込み中…</div>
+
+  <section class="panel" id="p-week">
+    <div class="weeknav">
+      <button class="btn" id="prevW" aria-label="前の週">◀</button>
+      <b id="weekLabel"></b>
+      <button class="btn" id="nextW" aria-label="次の週">▶</button>
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <div class="legend"><span><i style="background:var(--shift)"></i>在室予定</span><span><i style="background:var(--lesson)"></i>授業</span><span><i style="background:var(--event)"></i>行事</span></div>
+      <button class="btn" id="todayBtn">今日</button>
+    </div>
+    <div id="days"></div>
+  </section>
+
+  <section class="panel" id="p-events">
+    <div class="row"><h2>行事（講座・勉強会など）</h2><button class="btn yel" id="addEventBtn">＋ 追加</button></div>
+    <p class="muted" style="margin-bottom:10px">毎週の行事は一度登録すれば、毎週の予定に表示されます。特定の日だけ休みにするときは、週の予定でその日の行事をタップしてください。</p>
+    <div id="eventList"></div>
+  </section>
+
+  <section class="panel" id="p-qr">
+    <div class="card">
+      <h2>出勤QR</h2>
+      <p class="muted">教室のタブレットにかざすと、出勤・退勤が記録されます。画面を明るくしてかざしてください。印刷してカードにしてもOKです。</p>
+      <div id="qr"></div>
+      <p style="text-align:center;font-weight:900" id="qrName"></p>
+    </div>
+    <div class="card">
+      <h2>今日の出勤状況</h2>
+      <div id="attList"></div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar" id="tabbar" hidden>
+  <button data-p="week" aria-current="page">週の予定</button>
+  <button data-p="events">行事</button>
+  <button data-p="qr">出勤QR</button>
+</nav>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbwoPiOpPmUcykIrgUGYj5f0z1jnPA6gH3cU2aUDsqSLVKlAB9CytbtpYb8iqHAS81kQ-g/exec';
+  var LESSON_MIN = 90;
+  var WD = ['日','月','火','水','木','金','土'];
+  var STATUS = ['予定','キャンセル（24時間以内）','キャンセル（連絡なし）','取消'];
+  var KEY = (location.hash.match(/m=([0-9a-f]+)/) || [])[1] || '';
+  try {
+    if (KEY) { localStorage.setItem('subsc_mkey', KEY); history.replaceState(null, '', location.pathname); }
+    else KEY = localStorage.getItem('subsc_mkey') || '';
+  } catch(e){}
+
+  var D = null;            // 読み込んだデータ
+  var weekFrom = null;     // 表示中の週の初日（yyyy-mm-dd）
+
+  // ===== 通信 =====
+  function api(action, data){
+    var body = Object.assign({ action: action, mkey: KEY }, data || {});
+    return fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        if (!r.ok) { var e = new Error(r.message || 'エラーが起きました'); e.auth = r.auth === false; throw e; }
+        return r;
+      });
+  }
+  function load(){
+    return api('sch_load', { from: weekFrom, days: 7 }).then(function(r){
+      D = r;
+      if (!weekFrom) weekFrom = r.from;
+      document.getElementById('boot').style.display = 'none';
+      document.getElementById('tabbar').hidden = false;
+      document.getElementById('meName').textContent = r.me.name + 'さん' + (r.me.admin ? '（管理者）' : '');
+      if (!document.querySelector('.panel.on')) showPanel('week');
+      renderWeek(); renderEvents(); renderQr();
+    }).catch(function(e){
+      if (e.auth || !D) {
+        document.getElementById('boot').outerHTML = '<div class="msg"><b>' + esc(e.message) + '</b><p class="muted" style="margin-top:8px">管理者から受け取った専用のURLで開いてください。</p></div>';
+      } else toast(e.message);
+    });
+  }
+
+  // ===== 日付 =====
+  function parse(d){ var p = d.split('-'); return new Date(Date.UTC(+p[0], p[1]-1, +p[2])); }
+  function fmt(dt){ return dt.getUTCFullYear() + '-' + ('0'+(dt.getUTCMonth()+1)).slice(-2) + '-' + ('0'+dt.getUTCDate()).slice(-2); }
+  function addDays(d, n){ var dt = parse(d); dt.setUTCDate(dt.getUTCDate()+n); return fmt(dt); }
+  function wd(d){ return WD[parse(d).getUTCDay()]; }
+  function label(d){ var p = d.split('-'); return (+p[1]) + '/' + (+p[2]) + '（' + wd(d) + '）'; }
+  function mins(t){ var p = String(t).split(':'); return (+p[0])*60 + (+p[1]); }
+  function addMin(t, n){ var m = mins(t)+n; m = Math.min(m, 23*60+59); return ('0'+Math.floor(m/60)).slice(-2) + ':' + ('0'+(m%60)).slice(-2); }
+  function overlap(s1,e1,s2,e2){ return mins(s1) < mins(e2) && mins(s2) < mins(e1); }
+  function covers(ranges, s, e){
+    var cur = mins(s), end = mins(e);
+    ranges.map(function(r){ return [mins(r[0]), mins(r[1])]; }).sort(function(a,b){ return a[0]-b[0]; })
+      .forEach(function(r){ if (r[0] <= cur && r[1] > cur) cur = r[1]; });
+    return cur >= end;
+  }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function byStart(a, b){ return a.start < b.start ? -1 : a.start > b.start ? 1 : 0; }
+
+  // ===== 授業の注意 =====
+  function lessonWarnings(l, ignoreId){
+    var w = [];
+    if (!l.mentorId) w.push('担当メンターが決まっていません');
+    else {
+      var mine = D.shifts.filter(function(s){ return s.date === l.date && s.mentorId === l.mentorId; }).map(function(s){ return [s.start, s.end]; });
+      if (!covers(mine, l.start, l.end)) w.push('担当メンターの在室予定が授業時間をカバーしていません');
+    }
+    D.events.forEach(function(e){
+      if (e.date === l.date && !e.off && overlap(l.start, l.end, e.start, e.end)) w.push('行事「' + e.name + '」と重なっています');
+    });
+    D.lessons.forEach(function(o){
+      if (o.id === (ignoreId || l.id) || o.date !== l.date || o.status !== '予定') return;
+      if (!overlap(l.start, l.end, o.start, o.end)) return;
+      var same = (l.students || []).filter(function(id){ return o.students.indexOf(id) >= 0; });
+      if (same.length) w.push('同じ生徒の授業が ' + o.start + '〜 にもあります');
+      else if (o.mentorId === l.mentorId) w.push(o.start + '〜 の授業（' + o.names + '）と重なっています。まとめるなら合計4人まで');
+    });
+    return w;
+  }
+
+  // ===== 週の予定 =====
+  function renderWeek(){
+    var to = addDays(weekFrom, 6);
+    document.getElementById('weekLabel').textContent = label(weekFrom) + ' 〜 ' + label(to);
+    var html = '';
+    for (var i = 0; i < 7; i++) {
+      var d = addDays(weekFrom, i), w = wd(d);
+      var items = [];
+      D.shifts.filter(function(s){ return s.date === d; }).forEach(function(s){ items.push({ k:'shift', start:s.start, o:s }); });
+      D.lessons.filter(function(l){ return l.date === d; }).forEach(function(l){ items.push({ k:'lesson', start:l.start, o:l }); });
+      D.events.filter(function(e){ return e.date === d; }).forEach(function(e){ items.push({ k:'event', start:e.start, o:e }); });
+      items.sort(byStart);
+      html += '<div class="day' + (d === D.today ? ' today' : '') + '"><div class="dhead"><b class="' + (w==='日'?'sun':w==='土'?'sat':'') + '">' + label(d) + (d === D.today ? ' <span class="tag" style="background:var(--yellow)">今日</span>' : '') + '</b>'
+        + '<button class="add" data-add="' + d + '" aria-label="' + label(d) + 'に追加">＋</button></div>';
+      if (!items.length) html += '<div class="empty">予定なし</div>';
+      items.forEach(function(it){
+        var o = it.o;
+        if (it.k === 'shift') {
+          html += '<button class="item shift" data-shift="' + o.id + '"><span class="t">' + o.start + '〜' + o.end + '</span>在室　' + esc(o.mentor) + (o.memo ? '<small>' + esc(o.memo) + '</small>' : '') + '</button>';
+        } else if (it.k === 'lesson') {
+          var cancel = o.status !== '予定';
+          var ws = cancel ? [] : lessonWarnings(o);
+          html += '<button class="item lesson' + (cancel ? ' cancel' : '') + '" data-lesson="' + o.id + '"><span class="t">' + o.start + '〜' + o.end + '</span>授業　' + esc(o.names)
+            + (o.count >= 2 ? '<span class="tag">' + o.count + '人</span>' : '') + (cancel ? '<span class="tag">' + esc(o.status) + '</span>' : '')
+            + '<small>' + (o.content ? esc(o.content) + '　' : '') + '担当：' + esc(o.mentor || '未定') + '</small>'
+            + ws.map(function(x){ return '<span class="warn">⚠ ' + esc(x) + '</span>'; }).join('') + '</button>';
+        } else {
+          html += '<button class="item event' + (o.off ? ' off' : '') + '" data-event="' + o.id + '" data-date="' + d + '"><span class="t">' + o.start + '〜' + o.end + '</span><span class="nm">' + esc(o.name) + '</span>'
+            + (o.off ? '<span class="tag">この日は休み</span>' : '') + (o.public ? '' : '<span class="tag">非公開</span>') + '</button>';
+        }
+      });
+      html += '</div>';
+    }
+    document.getElementById('days').innerHTML = html;
+  }
+
+  document.getElementById('days').addEventListener('click', function(ev){
+    var b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.add) return addChoice(b.dataset.add);
+    if (b.dataset.shift) return shiftForm(find(D.shifts, b.dataset.shift));
+    if (b.dataset.lesson) return lessonForm(find(D.lessons, b.dataset.lesson));
+    if (b.dataset.event) return eventDayMenu(b.dataset.event, b.dataset.date);
+  });
+  function find(arr, id){ for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
+
+  document.getElementById('prevW').onclick = function(){ weekFrom = addDays(weekFrom, -7); reload(); };
+  document.getElementById('nextW').onclick = function(){ weekFrom = addDays(weekFrom, 7); reload(); };
+  document.getElementById('todayBtn').onclick = function(){ weekFrom = D.today; reload(); };
+  function reload(){ document.getElementById('days').innerHTML = '<div class="loading">読み込み中…</div>'; renderWeekLabelOnly(); return load(); }
+  function renderWeekLabelOnly(){ document.getElementById('weekLabel').textContent = label(weekFrom) + ' 〜 ' + label(addDays(weekFrom, 6)); }
+
+  // ===== モーダル =====
+  function openModal(html){ document.getElementById('sheet').innerHTML = html; document.getElementById('modal').classList.add('on'); var f = document.querySelector('#sheet input,#sheet select,#sheet button'); if (f) f.focus(); }
+  function closeModal(){ document.getElementById('modal').classList.remove('on'); }
+  document.getElementById('modal').addEventListener('click', function(ev){ if (ev.target.id === 'modal') closeModal(); });
+  document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') closeModal(); });
+  function val(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+  function toast(t){ var el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function(){ el.classList.remove('on'); }, 2400); }
+  function save(action, data, msg, btn){
+    if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
+    return api(action, data).then(function(){ closeModal(); toast(msg || '保存しました'); return load(); })
+      .catch(function(e){ toast(e.message); if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || '保存'; } });
+  }
+  function confirmDel(text, action, data){
+    if (!confirm(text)) return;
+    save(action, data, '削除しました');
+  }
+
+  function addChoice(d){
+    openModal('<h3>' + label(d) + ' に追加</h3><div class="choice">'
+      + '<button style="background:var(--shift)" id="cS">在室予定</button>'
+      + '<button style="background:var(--lesson);color:var(--lessonInk)" id="cL">授業</button>'
+      + '<button style="background:var(--event);color:var(--eventInk)" id="cE">行事（この日だけ）</button></div>'
+      + '<div class="acts"><button class="btn" onclick="closeModal()">閉じる</button></div>');
+    document.getElementById('cS').onclick = function(){ shiftForm(null, d); };
+    document.getElementById('cL').onclick = function(){ lessonForm(null, d); };
+    document.getElementById('cE').onclick = function(){ eventForm(null, d); };
+  }
+
+  // ----- 在室予定 -----
+  function shiftForm(s, d){
+    var isNew = !s;
+    s = s || { date: d, start: '16:00', end: '22:00', mentorId: D.me.id, memo: '' };
+    var mentorSel = D.me.admin
+      ? '<label class="f">メンター<select id="fM">' + D.mentors.map(function(m){ return '<option value="' + m.id + '"' + (m.id === s.mentorId ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>'
+      : '<p class="muted" style="margin-top:8px">' + esc(D.me.name) + 'さんの予定</p>';
+    openModal('<h3>在室予定' + (isNew ? 'を追加' : '') + '</h3>' + mentorSel
+      + '<label class="f">日付<input type="date" id="fD" value="' + s.date + '"></label>'
+      + '<div class="two"><label class="f">開始<input type="time" id="fS" value="' + s.start + '" step="300"></label><label class="f">終了<input type="time" id="fE" value="' + s.end + '" step="300"></label></div>'
+      + '<label class="f">メモ（任意）<input id="fN" value="' + esc(s.memo) + '" maxlength="100"></label>'
+      + '<div class="acts">' + (isNew ? '' : '<button class="btn danger" id="fDel">削除</button>')
+      + '<div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="fOk" data-label="保存">保存</button></div></div>');
+    document.getElementById('fOk').onclick = function(){
+      save('sch_shift_save', { id: isNew ? '' : s.id, date: val('fD'), start: val('fS'), end: val('fE'), memo: val('fN'), mentorId: D.me.admin ? val('fM') : D.me.id }, '在室予定を保存しました', this);
+    };
+    if (!isNew) document.getElementById('fDel').onclick = function(){ confirmDel('この在室予定を削除しますか？', 'sch_shift_delete', { id: s.id }); };
+  }
+
+  // ----- 授業 -----
+  var picked = [];
+  function lessonForm(l, d){
+    var isNew = !l;
+    l = l || { date: d, start: '17:00', end: addMin('17:00', LESSON_MIN), students: [], mentorId: D.me.id, content: '', status: '予定', memo: '' };
+    picked = l.students.slice();
+    openModal('<h3>授業' + (isNew ? 'を追加' : '') + '</h3>'
+      + '<label class="f">日付<input type="date" id="lD" value="' + l.date + '"></label>'
+      + '<div class="two"><label class="f">開始<input type="time" id="lS" value="' + l.start + '" step="300"></label><label class="f">終了<input type="time" id="lE" value="' + l.end + '" step="300"></label></div>'
+      + '<label class="f">生徒（最大4人）<input id="lQ" placeholder="名前で検索" autocomplete="off"></label>'
+      + '<div class="chips" id="lChips"></div><div class="picker" id="lPick"></div>'
+      + '<label class="f">担当<select id="lM"><option value="">未定</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '"' + (m.id === l.mentorId ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>'
+      + '<label class="f">内容（任意）<input id="lC" value="' + esc(l.content) + '" maxlength="60" placeholder="例：数学　関数"></label>'
+      + (isNew ? '' : '<label class="f">状態<select id="lT">' + STATUS.map(function(s){ return '<option' + (s === l.status ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></label>')
+      + '<label class="f">メモ（任意）<textarea id="lN" maxlength="200">' + esc(l.memo) + '</textarea></label>'
+      + '<div id="lWarn"></div>'
+      + '<div class="acts">' + (isNew ? '' : '<button class="btn danger" id="lDel">削除</button>')
+      + '<div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="lOk" data-label="保存">保存</button></div></div>'
+      + (isNew ? '' : '<p class="muted" style="margin-top:10px">キャンセルのときは削除せず「状態」を変えると、授業料の集計に反映されます。</p>'));
+    var startEl = document.getElementById('lS'), endEl = document.getElementById('lE');
+    startEl.addEventListener('change', function(){ if (startEl.value) endEl.value = addMin(startEl.value, LESSON_MIN); refreshLesson(l.id); });
+    ['lD','lE','lM'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ refreshLesson(l.id); }); });
+    document.getElementById('lQ').addEventListener('input', function(){ renderPicker(); });
+    document.getElementById('lPick').addEventListener('click', function(ev){
+      var b = ev.target.closest('button[data-sid]'); if (!b) return;
+      if (picked.length >= 4) { toast('一度に受講できるのは4人までです'); return; }
+      picked.push(b.dataset.sid); document.getElementById('lQ').value = ''; refreshLesson(l.id);
+    });
+    document.getElementById('lChips').addEventListener('click', function(ev){
+      var b = ev.target.closest('button[data-rm]'); if (!b) return;
+      picked = picked.filter(function(x){ return x !== b.dataset.rm; }); refreshLesson(l.id);
+    });
+    document.getElementById('lOk').onclick = function(){
+      if (!picked.length) { toast('生徒を選んでください'); return; }
+      save('sch_lesson_save', { id: isNew ? '' : l.id, date: val('lD'), start: val('lS'), end: val('lE'), students: picked, mentorId: val('lM'), content: val('lC'), status: isNew ? '予定' : val('lT'), memo: val('lN') }, '授業を保存しました', this);
+    };
+    if (!isNew) document.getElementById('lDel').onclick = function(){ confirmDel('この授業を削除しますか？\n（キャンセルの場合は「状態」を変えてください）', 'sch_lesson_delete', { id: l.id }); };
+    refreshLesson(l.id);
+  }
+  function studentName(id){ var s = find(D.students, id); return s ? s.name : id; }
+  function renderPicker(){
+    var q = val('lQ').replace(/\s/g, '');
+    var list = D.students.filter(function(s){ return picked.indexOf(s.id) < 0 && (!q || s.name.replace(/\s/g, '').indexOf(q) >= 0); });
+    var el = document.getElementById('lPick');
+    if (picked.length >= 4) { el.innerHTML = '<div class="none">4人選択済みです</div>'; return; }
+    el.innerHTML = list.length ? list.slice(0, 60).map(function(s){ return '<button type="button" data-sid="' + s.id + '">' + esc(s.name) + '</button>'; }).join('') : '<div class="none">該当する生徒がいません</div>';
+  }
+  function refreshLesson(id){
+    document.getElementById('lChips').innerHTML = picked.map(function(sid){ return '<span class="chip">' + esc(studentName(sid)) + '<button type="button" data-rm="' + sid + '" aria-label="外す">×</button></span>'; }).join('');
+    renderPicker();
+    var cur = { id: id, date: val('lD'), start: val('lS'), end: val('lE'), mentorId: val('lM'), students: picked };
+    var ws = (cur.date && cur.start && cur.end) ? lessonWarnings(cur, id) : [];
+    if (picked.length >= 2) ws.unshift(picked.length + '人で受講（2人以上の料金）');
+    document.getElementById('lWarn').innerHTML = ws.map(function(w, i){
+      var info = picked.length >= 2 && i === 0;
+      return '<span class="warn"' + (info ? ' style="background:var(--lesson);color:var(--lessonInk)"' : '') + '>' + (info ? '' : '⚠ ') + esc(w) + '</span>';
+    }).join('');
+  }
+
+  // ----- 行事 -----
+  function eventDayMenu(eid, d){
+    var e = D.events.filter(function(x){ return x.id === eid && x.date === d; })[0];
+    var def = find(D.eventDefs, eid);
+    if (!e || !def) return;
+    openModal('<h3>' + esc(e.name) + '</h3><p class="muted">' + label(d) + '　' + e.start + '〜' + e.end + '　' + (def.repeat === '毎週' ? '毎週' + def.weekday + '曜' : 'この日だけ') + '</p><div class="choice">'
+      + (def.repeat === '毎週' ? '<button style="background:var(--soft)" id="eOff">' + (e.off ? 'この日の休みを取り消す' : 'この日だけ休みにする') + '</button>' : '')
+      + '<button style="background:var(--event);color:var(--eventInk)" id="eEdit">行事の設定を変更する</button></div>'
+      + '<div class="acts"><button class="btn" onclick="closeModal()">閉じる</button></div>');
+    if (def.repeat === '毎週') document.getElementById('eOff').onclick = function(){ save('sch_event_off', { eventId: eid, date: d, off: !e.off }, e.off ? '休みを取り消しました' : 'この日を休みにしました', this); };
+    document.getElementById('eEdit').onclick = function(){ eventForm(def); };
+  }
+  var evRepeat = '毎週';
+  function eventForm(e, d){
+    var isNew = !e;
+    e = e || { name: '', repeat: d ? '単発' : '毎週', weekday: d ? wd(d) : '水', date: d || D.today, start: '19:00', end: '20:30', public: true, memo: '' };
+    evRepeat = e.repeat;
+    openModal('<h3>行事' + (isNew ? 'を追加' : 'の設定') + '</h3>'
+      + '<label class="f">名前<input id="eN" value="' + esc(e.name) + '" maxlength="40" placeholder="例：英語勉強会"></label>'
+      + '<div class="f" style="margin-top:12px;font-size:13px;font-weight:700;color:var(--sub)">くり返し<div class="seg" id="eR"><button type="button" data-v="毎週">毎週</button><button type="button" data-v="単発">この日だけ</button></div></div>'
+      + '<label class="f" id="eWW">曜日<select id="eW">' + WD.map(function(w){ return '<option' + (w === e.weekday ? ' selected' : '') + '>' + w + '</option>'; }).join('') + '</select></label>'
+      + '<label class="f" id="eDW">日付<input type="date" id="eD" value="' + (e.date || D.today) + '"></label>'
+      + '<div class="two"><label class="f">開始<input type="time" id="eS" value="' + e.start + '" step="300"></label><label class="f">終了<input type="time" id="eE" value="' + e.end + '" step="300"></label></div>'
+      + '<label class="f" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="eP" style="width:auto;display:inline"' + (e.public ? ' checked' : '') + '>保護者・生徒向けページに表示する</label>'
+      + '<label class="f">メモ（任意）<input id="eM" value="' + esc(e.memo) + '" maxlength="100"></label>'
+      + '<div class="acts">' + (isNew ? '' : '<button class="btn danger" id="eDel">削除</button>')
+      + '<div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="eOk" data-label="保存">保存</button></div></div>');
+    function seg(){
+      [].forEach.call(document.querySelectorAll('#eR button'), function(b){ b.setAttribute('aria-pressed', b.dataset.v === evRepeat ? 'true' : 'false'); });
+      document.getElementById('eWW').style.display = evRepeat === '毎週' ? '' : 'none';
+      document.getElementById('eDW').style.display = evRepeat === '単発' ? '' : 'none';
+    }
+    document.getElementById('eR').onclick = function(ev){ var b = ev.target.closest('button'); if (b) { evRepeat = b.dataset.v; seg(); } };
+    seg();
+    document.getElementById('eOk').onclick = function(){
+      save('sch_event_save', { id: isNew ? '' : e.id, name: val('eN'), repeat: evRepeat, weekday: val('eW'), date: val('eD'), start: val('eS'), end: val('eE'), public: document.getElementById('eP').checked, memo: val('eM') }, '行事を保存しました', this);
+    };
+    if (!isNew) document.getElementById('eDel').onclick = function(){ confirmDel('「' + e.name + '」を削除しますか？\n（毎週の行事は、すべての週から消えます）', 'sch_event_delete', { id: e.id }); };
+  }
+  function renderEvents(){
+    var defs = D.eventDefs.slice().sort(function(a, b){
+      var ka = (a.repeat === '毎週' ? '0' + WD.indexOf(a.weekday) : '1' + a.date) + a.start, kb = (b.repeat === '毎週' ? '0' + WD.indexOf(b.weekday) : '1' + b.date) + b.start;
+      return ka < kb ? -1 : 1;
+    });
+    document.getElementById('eventList').innerHTML = defs.length ? defs.map(function(e){
+      return '<button class="item event" style="background:var(--bg);color:var(--ink);padding:12px 14px" data-def="' + e.id + '"><b>' + esc(e.name) + '</b>' + (e.public ? '' : '<span class="tag" style="background:var(--soft)">非公開</span>')
+        + '<small>' + (e.repeat === '毎週' ? '毎週' + e.weekday + '曜' : label(e.date)) + '　' + e.start + '〜' + e.end + (e.memo ? '　' + esc(e.memo) : '') + '</small></button>';
+    }).join('') : '<div class="card muted">まだ登録されていません</div>';
+  }
+  document.getElementById('eventList').addEventListener('click', function(ev){ var b = ev.target.closest('button[data-def]'); if (b) eventForm(find(D.eventDefs, b.dataset.def)); });
+  document.getElementById('addEventBtn').onclick = function(){ eventForm(null); };
+
+  // ===== 出勤QR =====
+  var qrDone = false;
+  function renderQr(){
+    if (!qrDone && window.QRCode) {
+      new QRCode(document.getElementById('qr'), { text: 'SUBSC:' + D.me.id, width: 512, height: 512, correctLevel: QRCode.CorrectLevel.M });
+      document.getElementById('qrName').textContent = D.me.name + '（' + D.me.id + '）';
+      qrDone = true;
+    }
+    document.getElementById('attList').innerHTML = D.mentors.map(function(m){
+      var a = D.attendance[m.id];
+      var st = !a || !a.used ? '<span class="muted">QR未使用</span>' : a.in ? '<span class="on-badge">出勤中（' + a.since + '〜）</span>' : a.since ? '<span class="muted">退勤（' + a.since + '）</span>' : '<span class="muted">未出勤</span>';
+      return '<div class="att"><b>' + esc(m.name) + '</b>' + st + '</div>';
+    }).join('');
+  }
+
+  // ===== タブ =====
+  function showPanel(p){
+    [].forEach.call(document.querySelectorAll('.panel'), function(el){ el.classList.toggle('on', el.id === 'p-' + p); });
+    [].forEach.call(document.querySelectorAll('#tabbar button'), function(b){ if (b.dataset.p === p) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    window.scrollTo(0, 0);
+  }
+  document.getElementById('tabbar').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if (b) showPanel(b.dataset.p); });
+
+  if (!KEY) {
+    document.getElementById('boot').outerHTML = '<div class="msg"><b>このURLでは開けません</b><p class="muted" style="margin-top:8px">管理者から受け取った専用のURLで開いてください。</p></div>';
+  } else {
+    load();
+  }
+  // 画面に戻ってきたら最新にする
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible' && D && !document.getElementById('modal').classList.contains('on')) load(); });
+</script>
+</body>
+</html>
