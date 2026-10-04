@@ -72,6 +72,7 @@
   <div id="main" hidden>
     <div class="seg" id="who" role="group" aria-label="生徒"></div>
 
+    <div id="avMain"></div>
     <button class="cta" id="newBtn">授業を申し込む<span>候補の日時を3つまで選べます</span></button>
 
     <h2>これからの授業</h2>
@@ -157,6 +158,7 @@
     var order = { '変更依頼中': 0, '受付待ち': 1, '確定': 2, '却下': 3, '取消': 4 };
     rs.sort(function(a, b){ return (order[a.status] - order[b.status]) || (a.created < b.created ? 1 : -1); });
     document.getElementById('reqs').innerHTML = rs.length ? rs.map(reqCard).join('') : '<p class="empty">申し込み中の授業はありません。</p>';
+    renderAv('avMain');
   }
 
   function reqCard(r){
@@ -215,7 +217,7 @@
       ['d','t'].forEach(function(p){ document.getElementById(p + k).addEventListener('change', function(){ hint(k); }); });
     })(j);
     document.getElementById('fMentor').addEventListener('change', function(){ for (var k = 0; k < 3; k++) hint(k); });
-    avDate = null; renderAv();
+    renderAv('av');
     ['fContent','fWith','fMemo'].forEach(function(id){ document.getElementById(id).value = ''; });
     document.getElementById('fErr').textContent = '';
     document.getElementById('main').hidden = true;
@@ -280,8 +282,9 @@
   }
   function dayFree(day, mid){ return minus((day.byMentor && day.byMentor[mid]) || [], (day.busy && day.busy[mid]) || []); }
   function hasFree(day){ return (D.mentors || []).some(function(m){ return dayFree(day, m.id).some(function(f){ return f[1] - f[0] >= D.lessonMin; }); }); }
-  function renderAv(){
-    var el = document.getElementById('av'); if (!el) return;
+  function renderAv(id){
+    id = id || 'av';
+    var el = document.getElementById(id); if (!el) return;
     if (!D.mentors || !D.mentors.length) { el.innerHTML = ''; return; }
     if (!avDate) { var f = D.days.filter(hasFree)[0]; avDate = (f || D.days[0]).date; }
     var T0 = 24*60, T1 = 0;
@@ -289,7 +292,7 @@
     if (T1 <= T0) { T0 = 16*60; T1 = 22*60; }
     var span = T1 - T0;
     var day = D.days.filter(function(x){ return x.date === avDate; })[0];
-    var h = '<h3 style="margin-top:18px">メンターの空き状況</h3><p class="note">緑の時間をタップすると、その日時とメンターが希望に入ります（授業は90分）。</p>';
+    var h = '<h3 style="margin-top:18px">メンターの空き状況</h3><p class="note">' + (id === 'avMain' ? '緑の時間をタップすると、その日時が入った申し込み画面が開きます（授業は90分）。' : '緑の時間をタップすると、その日時とメンターが希望に入ります（授業は90分）。') + '</p>';
     h += '<div class="avdays">' + D.days.map(function(x){ var p = x.date.split('-'); return '<button type="button" data-avd="' + x.date + '" aria-pressed="' + (x.date === avDate) + '"' + (hasFree(x) ? '' : ' class="none"') + '>' + (+p[1]) + '/' + (+p[2]) + '<small>' + x.wd + '</small></button>'; }).join('') + '</div>';
     var axis = '';
     for (var t = T0; t <= T1; t += 60) axis += '<span class="avtick" style="left:' + ((t - T0) / span * 100) + '%">' + (t / 60) + '</span>';
@@ -309,14 +312,16 @@
     el.innerHTML = h;
   }
   document.addEventListener('click', function(ev){
-    var b = ev.target.closest ? ev.target.closest('#av button') : null; if (!b) return;
-    if (b.dataset.avd) { avDate = b.dataset.avd; renderAv(); return; }
+    var b = ev.target.closest ? ev.target.closest('#av button, #avMain button') : null; if (!b) return;
+    var box = b.closest('#avMain') ? 'avMain' : 'av';
+    if (b.dataset.avd) { avDate = b.dataset.avd; renderAv(box); return; }
     if (!b.dataset.m) return;
     var r = b.getBoundingClientRect(), s = +b.dataset.s, e = +b.dataset.e;
     var m = Math.floor((s + (ev.clientX - r.left) / r.width * (e - s)) / 30) * 30;
     if (m + D.lessonMin > e) m = e - D.lessonMin;
     if (m < s) m = s;
     var t = hmz(m);
+    if (box === 'avMain') openForm();
     for (var k = 0; k < 3; k++) {
       if (!document.getElementById('d' + k).value) {
         document.getElementById('d' + k).value = avDate;
