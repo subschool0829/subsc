@@ -117,6 +117,7 @@
   .tlev.off{opacity:.45;text-decoration:line-through}
   .tlles,.tlev{touch-action:none;user-select:none;-webkit-user-select:none}
   .tlles.dragging,.tlev.dragging{z-index:6;opacity:.9;box-shadow:0 6px 16px rgba(0,0,0,.3);cursor:grabbing}
+  .tlev.warnb{box-shadow:0 0 0 2px var(--warn)}
   .tltrack.droptarget{outline:2px dashed var(--lessonInk);outline-offset:-2px}
   :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 </style>
@@ -242,7 +243,7 @@
       if (!covers(mine, l.start, l.end)) w.push('担当メンターの在室予定が授業時間をカバーしていません');
     }
     D.events.forEach(function(e){
-      if (e.date === l.date && !e.off && overlap(l.start, l.end, e.start, e.end)) w.push('行事「' + e.name + '」と重なっています');
+      if (e.date === l.date && !e.off && (!e.mentorId || e.mentorId === l.mentorId) && overlap(l.start, l.end, e.start, e.end)) w.push((e.mentorId ? '担当の講座「' : '行事「') + evText(e) + '」と重なっています');
     });
     D.lessons.forEach(function(o){
       if (o.id === (ignoreId || l.id) || o.date !== l.date || o.status !== '予定') return;
@@ -282,7 +283,7 @@
             + '<small>' + (o.content ? esc(o.content) + '　' : '') + '担当：' + esc(o.mentor || '未定') + '</small>'
             + ws.map(function(x){ return '<span class="warn">⚠ ' + esc(x) + '</span>'; }).join('') + '</button>';
         } else {
-          html += '<button class="item event' + (o.off ? ' off' : '') + '" data-event="' + o.id + '" data-date="' + d + '"><span class="t">' + o.start + '〜' + o.end + '</span><span class="nm">' + esc(o.name) + '</span>'
+          html += '<button class="item event' + (o.off ? ' off' : '') + '" data-event="' + o.id + '" data-date="' + d + '"><span class="t">' + o.start + '〜' + o.end + '</span><span class="nm">' + esc(evText(o)) + '</span>' + (o.mentorId ? '<span class="tag">' + esc(mentorName(o.mentorId)) + '</span>' : '')
             + (o.off ? '<span class="tag">この日は休み</span>' : '') + (o.public ? '' : '<span class="tag">非公開</span>') + '</button>';
         }
       });
@@ -329,6 +330,11 @@
         + '<div class="tl"><div class="tlin" style="--hw:' + (6000/span) + '%">'
         + '<div class="tlrow tlaxis"><div class="tlname"></div><div class="tltrack">' + axis + '</div></div>';
       var lessonsDay = D.lessons.filter(function(l){ return l.date === d; });
+      var evsDay = D.events.filter(function(e){ return e.date === d; });
+      var evBtn = function(e){
+        var warn = !e.off && e.mentorId && !covers(D.shifts.filter(function(s){ return s.date === e.date && s.mentorId === e.mentorId; }).map(function(s){ return [s.start, s.end]; }), e.start, e.end);
+        return '<button class="tlev' + (e.off ? ' off' : '') + (warn ? ' warnb' : '') + '" data-event="' + e.id + '" data-date="' + e.date + '" style="' + pos(e.start, e.end) + '" title="' + esc(evText(e)) + '">' + esc(evText(e)) + '</button>';
+      };
       var rows = D.mentors.map(function(m){ return { id: m.id, name: m.name }; });
       if (lessonsDay.some(function(l){ return !l.mentorId; })) rows.push({ id: '', name: '担当未定' });
       rows.forEach(function(m){
@@ -338,12 +344,13 @@
           var cancel = l.status !== '予定', warn = !cancel && lessonWarnings(l).length;
           html += '<button class="tlles' + (cancel ? ' cancel' : '') + (warn ? ' warnb' : '') + '" data-lesson="' + l.id + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + l.names) + '">' + l.start + ' ' + esc(l.names) + '</button>';
         });
+        if (m.id) evsDay.filter(function(e){ return e.mentorId === m.id; }).forEach(function(e){ html += evBtn(e); });
         html += '</div></div>';
       });
-      var evs = D.events.filter(function(e){ return e.date === d; });
+      var evs = evsDay.filter(function(e){ return !e.mentorId || !find(D.mentors, e.mentorId); });
       if (evs.length) {
         html += '<div class="tlrow"><div class="tlname">行事</div><div class="tltrack" style="cursor:default">';
-        evs.forEach(function(e){ html += '<button class="tlev' + (e.off ? ' off' : '') + '" data-event="' + e.id + '" data-date="' + d + '" style="' + pos(e.start, e.end) + '" title="' + esc(e.name) + '">' + esc(e.name) + '</button>'; });
+        evs.forEach(function(e){ html += evBtn(e); });
         html += '</div></div>';
       }
       html += '</div></div></div>';
@@ -369,6 +376,14 @@
 
   // ===== ドラッグで移動 =====
   var TL = { T0: 480, span: 960 }, drag = null, dragGuard = false;
+  function evText(e){ return (e.target ? e.target + '　' : '') + e.name; }
+  function evOneDay(def, date, patch, msg, btn){
+    btn.disabled = true;
+    api('sch_event_off', { eventId: def.id, date: date, off: true })
+      .then(function(){ return api('sch_event_save', Object.assign({ id: '', repeat: '単発', date: date, name: def.name, public: def.public, memo: def.memo, start: def.start, end: def.end, mentorId: def.mentorId, target: def.target }, patch)); })
+      .then(function(){ closeModal(); toast(msg); return load(); })
+      .catch(function(err){ toast(err.message); btn.disabled = false; });
+  }
   function mentorName(id){ var m = find(D.mentors, id); return m ? m.name : '担当未定'; }
   function trackAt(x, y){ var el = document.elementFromPoint(x, y); return el ? el.closest('[data-track]') : null; }
   function clearDrop(){ [].forEach.call(document.querySelectorAll('.droptarget'), function(el){ el.classList.remove('droptarget'); }); }
@@ -393,7 +408,7 @@
     drag.ns = ns;
     drag.b.style.left = ((ns - TL.T0) / TL.span * 100) + '%';
     drag.b.textContent = hm(ns) + ' ' + (drag.isL ? drag.o.names : drag.o.name);
-    if (drag.isL) {
+    {
       drag.b.style.transform = 'translateY(' + dy + 'px)';
       drag.b.style.pointerEvents = 'none';
       var t = trackAt(ev.clientX, ev.clientY);
@@ -413,8 +428,10 @@
       if (ns === d.startMin && nd === d.o.date && nm === (d.o.mentorId || '')) return renderWeek();
       moveLessonConfirm(d.o, nd, hm(ns), hm(ns + d.dur), nm);
     } else {
-      if (ns === d.startMin) return renderWeek();
-      moveEventConfirm(d.o, hm(ns), hm(ns + d.dur));
+      var te = d.target && d.target.dataset.date === d.o.date ? d.target : null;
+      var nm2 = te ? te.dataset.mentor : (d.o.mentorId || '');
+      if (ns === d.startMin && nm2 === (d.o.mentorId || '')) return renderWeek();
+      moveEventConfirm(d.o, hm(ns), hm(ns + d.dur), nm2);
     }
   });
   document.addEventListener('pointercancel', function(){ if (drag) { drag = null; clearDrop(); renderWeek(); } });
@@ -424,33 +441,28 @@
       + '<p class="muted">' + label(l.date) + ' ' + l.start + '〜' + l.end + '（' + esc(mentorName(l.mentorId)) + '）</p>'
       + '<p style="font-weight:900;margin:6px 0">→ ' + label(nd) + ' ' + ns + '〜' + ne + '（' + esc(mentorName(nm)) + '）</p>'
       + ws.map(function(w){ return '<span class="warn">⚠ ' + esc(w) + '</span>'; }).join('')
-      + '<p class="muted" style="margin-top:10px">生徒・保護者への連絡は自動では送られません。必要に応じて公式LINEでお知らせください。</p>'
+      + '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="mvNt" style="width:auto;display:inline">生徒・保護者にLINEで変更をお知らせする</label>'
       + '<div class="acts"><div class="r"><button class="btn" id="mvNo">やめる</button><button class="btn pri" id="mvOk" data-label="移動する">移動する</button></div></div>');
     document.getElementById('mvNo').onclick = closeModal;
     document.getElementById('mvOk').onclick = function(){
-      save('sch_lesson_save', { id: l.id, date: nd, start: ns, end: ne, students: l.students, mentorId: nm, content: l.content, status: l.status, memo: l.memo }, '授業を移動しました', this);
+      save('sch_lesson_save', { id: l.id, date: nd, start: ns, end: ne, students: l.students, mentorId: nm, content: l.content, status: l.status, memo: l.memo, notify: document.getElementById('mvNt').checked }, '授業を移動しました', this);
     };
   }
-  function moveEventConfirm(e, ns, ne){
+  function moveEventConfirm(e, ns, ne, nm){
     var def = find(D.eventDefs, e.id); if (!def) return renderWeek();
+    if (nm == null) nm = def.mentorId || '';
     var weekly = def.repeat === '毎週';
-    var base = { name: def.name, public: def.public, memo: def.memo };
-    openModal('<h3>行事を移動</h3><p><b>' + esc(e.name) + '</b></p><p class="muted">' + label(e.date) + ' ' + e.start + '〜' + e.end + '</p>'
-      + '<p style="font-weight:900;margin:6px 0">→ ' + label(e.date) + ' ' + ns + '〜' + ne + '</p>'
-      + (weekly ? '<div class="choice"><button style="background:var(--event);color:var(--eventInk)" id="evOne">この日だけ移動する</button><button style="background:var(--soft)" id="evAll">毎週の時間を変更する</button></div>' : '')
+    var base = { name: def.name, public: def.public, memo: def.memo, target: def.target, mentorId: nm };
+    openModal('<h3>' + (def.mentorId || nm ? '講座' : '行事') + 'を移動</h3><p><b>' + esc(evText(e)) + '</b></p><p class="muted">' + label(e.date) + ' ' + e.start + '〜' + e.end + (def.mentorId ? '（' + esc(mentorName(def.mentorId)) + '）' : '') + '</p>'
+      + '<p style="font-weight:900;margin:6px 0">→ ' + label(e.date) + ' ' + ns + '〜' + ne + (nm ? '（' + esc(mentorName(nm)) + '）' : '') + '</p>'
+      + (weekly ? '<div class="choice"><button style="background:var(--event);color:var(--eventInk)" id="evOne">この日だけ変更する</button><button style="background:var(--soft)" id="evAll">毎週の設定を変更する</button></div>' : '')
       + '<div class="acts"><div class="r"><button class="btn" id="mvNo">やめる</button>' + (weekly ? '' : '<button class="btn pri" id="mvOk" data-label="移動する">移動する</button>') + '</div></div>');
     document.getElementById('mvNo').onclick = closeModal;
     if (weekly) {
-      document.getElementById('evAll').onclick = function(){ save('sch_event_save', Object.assign({ id: def.id, repeat: '毎週', weekday: def.weekday, start: ns, end: ne }, base), '毎週の時間を変更しました', this); };
-      document.getElementById('evOne').onclick = function(){
-        var btn = this; btn.disabled = true;
-        api('sch_event_off', { eventId: def.id, date: e.date, off: true })
-          .then(function(){ return api('sch_event_save', Object.assign({ id: '', repeat: '単発', date: e.date, start: ns, end: ne }, base)); })
-          .then(function(){ closeModal(); toast('この日だけ移動しました'); return load(); })
-          .catch(function(err){ toast(err.message); btn.disabled = false; });
-      };
+      document.getElementById('evAll').onclick = function(){ save('sch_event_save', Object.assign({ id: def.id, repeat: '毎週', weekday: def.weekday, start: ns, end: ne }, base), '毎週の設定を変更しました', this); };
+      document.getElementById('evOne').onclick = function(){ evOneDay(def, e.date, { start: ns, end: ne, mentorId: nm }, 'この日だけ変更しました', this); };
     } else {
-      document.getElementById('mvOk').onclick = function(){ save('sch_event_save', Object.assign({ id: def.id, repeat: '単発', date: def.date, start: ns, end: ne }, base), '行事を移動しました', this); };
+      document.getElementById('mvOk').onclick = function(){ save('sch_event_save', Object.assign({ id: def.id, repeat: '単発', date: def.date, start: ns, end: ne }, base), '移動しました', this); };
     }
   }
 
@@ -517,6 +529,7 @@
       + '<label class="f">内容（任意）<input id="lC" value="' + esc(l.content) + '" maxlength="60" placeholder="例：数学　関数"></label>'
       + (isNew ? '' : '<label class="f">状態<select id="lT">' + STATUS.map(function(s){ return '<option' + (s === l.status ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></label>')
       + '<label class="f">メモ（任意）<textarea id="lN" maxlength="200">' + esc(l.memo) + '</textarea></label>'
+      + (isNew ? '' : '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="lNt" style="width:auto;display:inline">日時・担当の変更を生徒・保護者にLINEでお知らせする</label>')
       + '<div id="lWarn"></div>'
       + '<div class="acts">' + (isNew ? '' : '<button class="btn danger" id="lDel">削除</button>')
       + '<div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="lOk" data-label="保存">保存</button></div></div>'
@@ -536,7 +549,7 @@
     });
     document.getElementById('lOk').onclick = function(){
       if (!picked.length) { toast('生徒を選んでください'); return; }
-      save('sch_lesson_save', { id: isNew ? '' : l.id, date: val('lD'), start: val('lS'), end: val('lE'), students: picked, mentorId: val('lM'), content: val('lC'), status: isNew ? '予定' : val('lT'), memo: val('lN') }, '授業を保存しました', this);
+      save('sch_lesson_save', { id: isNew ? '' : l.id, date: val('lD'), start: val('lS'), end: val('lE'), students: picked, mentorId: val('lM'), content: val('lC'), status: isNew ? '予定' : val('lT'), memo: val('lN'), notify: !isNew && document.getElementById('lNt').checked }, '授業を保存しました', this);
     };
     if (!isNew) document.getElementById('lDel').onclick = function(){ confirmDel('この授業を削除しますか？\n（キャンセルの場合は「状態」を変えてください）', 'sch_lesson_delete', { id: l.id }); };
     refreshLesson(l.id);
@@ -566,20 +579,30 @@
     var e = D.events.filter(function(x){ return x.id === eid && x.date === d; })[0];
     var def = find(D.eventDefs, eid);
     if (!e || !def) return;
-    openModal('<h3>' + esc(e.name) + '</h3><p class="muted">' + label(d) + '　' + e.start + '〜' + e.end + '　' + (def.repeat === '毎週' ? '毎週' + def.weekday + '曜' : 'この日だけ') + '</p><div class="choice">'
+    openModal('<h3>' + esc(evText(e)) + '</h3><p class="muted">' + label(d) + '　' + e.start + '〜' + e.end + '　' + (def.repeat === '毎週' ? '毎週' + def.weekday + '曜' : 'この日だけ') + (e.mentorId ? '　担当：' + esc(mentorName(e.mentorId)) : '') + '</p><div class="choice">'
       + (def.repeat === '毎週' ? '<button style="background:var(--soft)" id="eOff">' + (e.off ? 'この日の休みを取り消す' : 'この日だけ休みにする') + '</button>' : '')
+      + (def.repeat === '毎週' && !e.off ? '<button style="background:var(--soft)" id="eMent">この日だけ担当を変える</button>' : '')
       + '<button style="background:var(--event);color:var(--eventInk)" id="eEdit">行事の設定を変更する</button></div>'
       + '<div class="acts"><button class="btn" onclick="closeModal()">閉じる</button></div>');
     if (def.repeat === '毎週') document.getElementById('eOff').onclick = function(){ save('sch_event_off', { eventId: eid, date: d, off: !e.off }, e.off ? '休みを取り消しました' : 'この日を休みにしました', this); };
     document.getElementById('eEdit').onclick = function(){ eventForm(def); };
+    var em = document.getElementById('eMent');
+    if (em) em.onclick = function(){
+      openModal('<h3>この日だけ担当を変える</h3><p class="muted">' + esc(evText(e)) + '　' + label(d) + ' ' + e.start + '〜' + e.end + '</p><label class="f">担当<select id="emM"><option value="">なし</option>' + mentorOpts(e.mentorId) + '</select></label>'
+        + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="emOk">変更する</button></div></div>');
+      document.getElementById('emOk').onclick = function(){ evOneDay(def, d, { mentorId: val('emM') }, 'この日だけ担当を変更しました', this); };
+    };
   }
   var evRepeat = '毎週';
   function eventForm(e, d){
     var isNew = !e;
-    e = e || { name: '', repeat: d ? '単発' : '毎週', weekday: d ? wd(d) : '水', date: d || D.today, start: '19:00', end: '20:30', public: true, memo: '' };
+    e = e || { name: '', repeat: d ? '単発' : '毎週', weekday: d ? wd(d) : '水', date: d || D.today, start: '19:00', end: '20:30', public: true, memo: '', mentorId: '', target: '' };
     evRepeat = e.repeat;
-    openModal('<h3>行事' + (isNew ? 'を追加' : 'の設定') + '</h3>'
-      + '<label class="f">名前<input id="eN" value="' + esc(e.name) + '" maxlength="40" placeholder="例：英語勉強会"></label>'
+    openModal('<h3>行事・講座' + (isNew ? 'を追加' : 'の設定') + '</h3>'
+      + '<label class="f">名前<input id="eN" value="' + esc(e.name) + '" maxlength="40" placeholder="例：数学講座、英語勉強会"></label>'
+      + '<div class="two"><label class="f">対象<select id="eTg">' + ['', '小学生', '中1', '中2', '中3', '高校生', '全学年'].map(function(t){ return '<option value="' + t + '"' + (t === (e.target || '') ? ' selected' : '') + '>' + (t || 'なし') + '</option>'; }).join('') + '</select></label>'
+      + '<label class="f">担当<select id="eMt"><option value="">なし</option>' + mentorOpts(e.mentorId) + '</select></label></div>'
+      + '<p class="muted" style="margin-top:6px">担当を選ぶと、時間軸でそのメンターの行に表示されます（講座など）。生徒への通知は送られません。</p>'
       + '<div class="f" style="margin-top:12px;font-size:13px;font-weight:700;color:var(--sub)">くり返し<div class="seg" id="eR"><button type="button" data-v="毎週">毎週</button><button type="button" data-v="単発">この日だけ</button></div></div>'
       + '<label class="f" id="eWW">曜日<select id="eW">' + WD.map(function(w){ return '<option' + (w === e.weekday ? ' selected' : '') + '>' + w + '</option>'; }).join('') + '</select></label>'
       + '<label class="f" id="eDW">日付<input type="date" id="eD" value="' + (e.date || D.today) + '"></label>'
@@ -596,7 +619,7 @@
     document.getElementById('eR').onclick = function(ev){ var b = ev.target.closest('button'); if (b) { evRepeat = b.dataset.v; seg(); } };
     seg();
     document.getElementById('eOk').onclick = function(){
-      save('sch_event_save', { id: isNew ? '' : e.id, name: val('eN'), repeat: evRepeat, weekday: val('eW'), date: val('eD'), start: val('eS'), end: val('eE'), public: document.getElementById('eP').checked, memo: val('eM') }, '行事を保存しました', this);
+      save('sch_event_save', { id: isNew ? '' : e.id, name: val('eN'), repeat: evRepeat, weekday: val('eW'), date: val('eD'), start: val('eS'), end: val('eE'), public: document.getElementById('eP').checked, memo: val('eM'), mentorId: val('eMt'), target: val('eTg') }, '保存しました', this);
     };
     if (!isNew) document.getElementById('eDel').onclick = function(){ confirmDel('「' + e.name + '」を削除しますか？\n（毎週の行事は、すべての週から消えます）', 'sch_event_delete', { id: e.id }); };
   }
@@ -606,8 +629,8 @@
       return ka < kb ? -1 : 1;
     });
     document.getElementById('eventList').innerHTML = defs.length ? defs.map(function(e){
-      return '<button class="item event" style="background:var(--bg);color:var(--ink);padding:12px 14px" data-def="' + e.id + '"><b>' + esc(e.name) + '</b>' + (e.public ? '' : '<span class="tag" style="background:var(--soft)">非公開</span>')
-        + '<small>' + (e.repeat === '毎週' ? '毎週' + e.weekday + '曜' : label(e.date)) + '　' + e.start + '〜' + e.end + (e.memo ? '　' + esc(e.memo) : '') + '</small></button>';
+      return '<button class="item event" style="background:var(--bg);color:var(--ink);padding:12px 14px" data-def="' + e.id + '"><b>' + esc(evText(e)) + '</b>' + (e.public ? '' : '<span class="tag" style="background:var(--soft)">非公開</span>')
+        + '<small>' + (e.repeat === '毎週' ? '毎週' + e.weekday + '曜' : label(e.date)) + '　' + e.start + '〜' + e.end + (e.mentorId ? '　担当：' + esc(mentorName(e.mentorId)) : '') + (e.memo ? '　' + esc(e.memo) : '') + '</small></button>';
     }).join('') : '<div class="card muted">まだ登録されていません</div>';
   }
   document.getElementById('eventList').addEventListener('click', function(ev){ var b = ev.target.closest('button[data-def]'); if (b) eventForm(find(D.eventDefs, b.dataset.def)); });
