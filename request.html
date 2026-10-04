@@ -154,6 +154,7 @@
       if (r.status === '却下' && r.message) h += '<div class="msg">' + esc(r.message) + '</div>';
     }
     if (r.content) h += '<div class="sub" style="margin-top:6px">内容：' + esc(r.content) + '</div>';
+    if (r.prefMentor) h += '<div class="sub">希望メンター：' + esc(r.prefMentor) + 'さん</div>';
     if (r.status === '受付待ち' || r.status === '変更依頼中') h += '<button class="link" data-cancel="' + r.id + '">この申し込みを取り消す</button>';
     return h + '</div>';
   }
@@ -180,7 +181,8 @@
   for (var m = 10*60; m <= 21*60; m += 30) TIMES.push(('0'+Math.floor(m/60)).slice(-2) + ':' + ('0'+(m%60)).slice(-2));
   function openForm(){
     var st = D.students.filter(function(s){ return s.id === cur; })[0];
-    document.getElementById('formWho').innerHTML = '<p><b>' + esc(st.name) + 'さん</b>の授業を申し込みます。</p>';
+    document.getElementById('formWho').innerHTML = '<p><b>' + esc(st.name) + 'さん</b>の授業を申し込みます。</p>'
+      + '<label class="f">希望のメンター <small>（任意）</small><select id="fMentor"><option value="">指定なし</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '">' + esc(m.name) + 'さん</option>'; }).join('') + '</select></label>';
     var max = D.days[D.days.length - 1].date;
     var h = '';
     for (var i = 0; i < 3; i++) {
@@ -193,6 +195,7 @@
     for (var j = 0; j < 3; j++) (function(k){
       ['d','t'].forEach(function(p){ document.getElementById(p + k).addEventListener('change', function(){ hint(k); }); });
     })(j);
+    document.getElementById('fMentor').addEventListener('change', function(){ for (var k = 0; k < 3; k++) hint(k); });
     ['fContent','fWith','fMemo'].forEach(function(id){ document.getElementById(id).value = ''; });
     document.getElementById('fErr').textContent = '';
     document.getElementById('main').hidden = true;
@@ -203,14 +206,18 @@
     var d = document.getElementById('d' + i).value, t = document.getElementById('t' + i).value, el = document.getElementById('h' + i);
     if (!d) { el.innerHTML = ''; return; }
     var day = D.days.filter(function(x){ return x.date === d; })[0];
+    var mid = document.getElementById('fMentor').value;
+    var m = D.mentors.filter(function(x){ return x.id === mid; })[0];
+    var who = m ? m.name + 'さん' : 'メンター';
     var parts = [];
-    if (!day) parts.push('<span>メンターの予定はまだ決まっていない日です。相談になります。</span>');
+    if (!day) parts.push('<span>' + esc(who) + 'の予定はまだ決まっていない日です。相談になります。</span>');
     else {
-      parts.push(day.presence.length ? 'この日のメンター：' + day.presence.map(function(p){ return p[0] + '〜' + p[1]; }).join('、') : '<span class="warn">この日はメンターの予定がまだありません</span>');
+      var pres = m ? (day.byMentor[mid] || []) : day.presence;
+      parts.push(pres.length ? 'この日の' + esc(who) + '：' + pres.map(function(p){ return p[0] + '〜' + p[1]; }).join('、') : '<span class="warn">この日は' + esc(who) + 'の予定がまだありません</span>');
       if (t) {
         var s = mins(t), e = s + D.lessonMin;
-        var ok = day.presence.some(function(p){ return mins(p[0]) <= s && mins(p[1]) >= e; });
-        if (day.presence.length) parts.push(ok ? '<span class="ok">メンターがいる時間です</span>' : '<span class="warn">メンターがいない時間を含みます（相談になります）</span>');
+        var ok = pres.some(function(p){ return mins(p[0]) <= s && mins(p[1]) >= e; });
+        if (pres.length) parts.push(ok ? '<span class="ok">' + esc(who) + 'がいる時間です</span>' : '<span class="warn">' + esc(who) + 'がいない時間を含みます（相談になります）</span>');
         day.events.forEach(function(ev){ if (mins(ev.start) < e && s < mins(ev.end)) parts.push('<span class="warn">「' + esc(ev.name) + '」（' + ev.start + '〜' + ev.end + '）と重なります</span>'); });
       }
     }
@@ -229,7 +236,7 @@
     if (!slots.length) { err.textContent = '第1希望の日時を選んでください'; return; }
     err.textContent = '';
     var btn = this; btn.disabled = true; btn.textContent = '送信中…';
-    api('req_create', { studentId: cur, slots: slots, content: document.getElementById('fContent').value, with: document.getElementById('fWith').value, memo: document.getElementById('fMemo').value })
+    api('req_create', { studentId: cur, slots: slots, mentorId: document.getElementById('fMentor').value, content: document.getElementById('fContent').value, with: document.getElementById('fWith').value, memo: document.getElementById('fMemo').value })
       .then(function(){ toast('申し込みました。お返事は公式LINEでお送りします'); closeForm(); return load(); })
       .catch(function(e){ err.textContent = e.message; })
       .then(function(){ btn.disabled = false; btn.textContent = 'この内容で申し込む'; });
