@@ -57,6 +57,15 @@
   .avfree.short{background:#B9DFCA;cursor:default}
   .avlegend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--sub);margin-top:8px}
   .avlegend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+  .nowbox{margin-top:16px;background:var(--tint);border-radius:16px;padding:14px 16px}
+  .nowbox:empty{display:none}
+  .nowt{font-weight:900;font-size:14px}
+  .nowt small{font-weight:500;color:var(--sub);margin-left:8px;font-size:12px}
+  .nowr{font-weight:700;margin-top:2px}
+  .nowr .big{font-size:32px;font-weight:900;margin-right:4px;font-variant-numeric:tabular-nums}
+  .nowm{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .mt{font-size:13px;font-weight:700;border-radius:999px;padding:2px 12px;background:#fff;color:var(--sub)}
+  .mt.on{background:#0F6E56;color:#fff}
 </style>
 </head>
 <body>
@@ -70,6 +79,7 @@
   <p class="loading" id="boot">読み込み中…</p>
 
   <div id="main" hidden>
+    <div class="nowbox" id="now"></div>
     <div class="seg" id="who" role="group" aria-label="生徒"></div>
 
     <div id="avMain"></div>
@@ -130,9 +140,16 @@
   function toast(t){ var el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function(){ el.classList.remove('on'); }, 2600); }
   function fail(msg){ document.getElementById('boot').hidden = false; document.getElementById('boot').innerHTML = '<b>' + esc(msg) + '</b>'; document.getElementById('main').hidden = true; document.getElementById('form').hidden = true; }
 
+  function renderNow(n){
+    var el = document.getElementById('now'); if (!el || !n) return;
+    el.innerHTML = '<div class="nowt">いまの教室<small>' + esc(n.at) + ' 現在</small></div>'
+      + '<div class="nowr"><span class="big">' + n.students + '</span>人が在室中</div>'
+      + '<div class="nowm">' + n.mentors.map(function(m){ return '<span class="mt' + (m.in ? ' on' : '') + '">' + esc(m.name) + (m.in ? '　出勤中' : '　不在') + '</span>'; }).join('') + '</div>';
+  }
   function load(){
     return api('req_load').then(function(r){
       D = r;
+      renderNow(r.now);
       if (!cur || !D.students.some(function(s){ return s.id === cur; })) cur = D.students[0].id;
       document.getElementById('boot').hidden = true;
       if (document.getElementById('form').hidden) document.getElementById('main').hidden = false;
