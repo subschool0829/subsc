@@ -39,6 +39,24 @@
   .toast.on{opacity:1}
   .loading{color:var(--sub);padding:30px 0}
   .back{font:inherit;font-weight:700;background:none;border:1.5px solid var(--ink);border-radius:999px;padding:6px 16px;cursor:pointer;margin-top:20px}
+  .avdays{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px}
+  .avdays button{flex:none;font:inherit;font-weight:700;font-size:14px;border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:4px 10px;cursor:pointer;line-height:1.2;text-align:center}
+  .avdays button small{display:block;font-size:11px;color:var(--sub)}
+  .avdays button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .avdays button[aria-pressed="true"] small{color:#fff}
+  .avdays button.none{opacity:.45}
+  .avrow{display:flex;align-items:center;margin-top:6px}
+  .avname{flex:none;width:64px;font-size:13px;font-weight:700}
+  .avtrack{position:relative;flex:1;height:40px;background:#fff;border:1px solid var(--line);border-radius:8px}
+  .avtrack.avaxis{height:16px;border:0;background:none}
+  .avtick{position:absolute;top:0;font-size:10px;color:var(--sub);transform:translateX(-50%)}
+  .avtick:first-child{transform:none}
+  .avtick:last-child{transform:translateX(-100%)}
+  .avbusy{position:absolute;top:0;bottom:0;background:#CFCFCF;border-radius:7px}
+  .avfree{position:absolute;top:0;bottom:0;background:#3BA272;border:0;border-radius:7px;cursor:pointer;padding:0}
+  .avfree.short{background:#B9DFCA;cursor:default}
+  .avlegend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--sub);margin-top:8px}
+  .avlegend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
 </style>
 </head>
 <body>
@@ -73,6 +91,7 @@
     <h2>授業を申し込む</h2>
     <p class="note">ご希望の日時を選んでください。メンターが確認して、公式LINEでお返事します。</p>
     <div id="formWho"></div>
+    <div id="av"></div>
     <div id="cands"></div>
     <label class="f">内容 <small>（任意）</small><input id="fContent" maxlength="60" placeholder="例：数学　二次関数の復習"></label>
     <label class="f">一緒に受けたい人 <small>（任意）</small><input id="fWith" maxlength="60" placeholder="例：〇〇さんと一緒に"></label>
@@ -196,6 +215,7 @@
       ['d','t'].forEach(function(p){ document.getElementById(p + k).addEventListener('change', function(){ hint(k); }); });
     })(j);
     document.getElementById('fMentor').addEventListener('change', function(){ for (var k = 0; k < 3; k++) hint(k); });
+    avDate = null; renderAv();
     ['fContent','fWith','fMemo'].forEach(function(id){ document.getElementById(id).value = ''; });
     document.getElementById('fErr').textContent = '';
     document.getElementById('main').hidden = true;
@@ -241,6 +261,76 @@
       .catch(function(e){ err.textContent = e.message; })
       .then(function(){ btn.disabled = false; btn.textContent = 'この内容で申し込む'; });
   };
+
+  // ===== メンターの空き状況 =====
+  var avDate = null;
+  function hmz(m){ return ('0'+Math.floor(m/60)).slice(-2) + ':' + ('0'+(m%60)).slice(-2); }
+  function minus(sh, busy){
+    var out = [];
+    sh.forEach(function(r){
+      var segs = [[mins(r[0]), mins(r[1])]];
+      busy.forEach(function(b){
+        var bs = mins(b[0]), be = mins(b[1]), n = [];
+        segs.forEach(function(s){ if (be <= s[0] || bs >= s[1]) n.push(s); else { if (bs > s[0]) n.push([s[0], bs]); if (be < s[1]) n.push([be, s[1]]); } });
+        segs = n;
+      });
+      out = out.concat(segs);
+    });
+    return out.sort(function(a, b){ return a[0] - b[0]; });
+  }
+  function dayFree(day, mid){ return minus((day.byMentor && day.byMentor[mid]) || [], (day.busy && day.busy[mid]) || []); }
+  function hasFree(day){ return (D.mentors || []).some(function(m){ return dayFree(day, m.id).some(function(f){ return f[1] - f[0] >= D.lessonMin; }); }); }
+  function renderAv(){
+    var el = document.getElementById('av'); if (!el) return;
+    if (!D.mentors || !D.mentors.length) { el.innerHTML = ''; return; }
+    if (!avDate) { var f = D.days.filter(hasFree)[0]; avDate = (f || D.days[0]).date; }
+    var T0 = 24*60, T1 = 0;
+    D.days.forEach(function(day){ Object.keys(day.byMentor || {}).forEach(function(k){ day.byMentor[k].forEach(function(r){ T0 = Math.min(T0, Math.floor(mins(r[0])/60)*60); T1 = Math.max(T1, Math.ceil(mins(r[1])/60)*60); }); }); });
+    if (T1 <= T0) { T0 = 16*60; T1 = 22*60; }
+    var span = T1 - T0;
+    var day = D.days.filter(function(x){ return x.date === avDate; })[0];
+    var h = '<h3 style="margin-top:18px">メンターの空き状況</h3><p class="note">緑の時間をタップすると、その日時とメンターが希望に入ります（授業は90分）。</p>';
+    h += '<div class="avdays">' + D.days.map(function(x){ var p = x.date.split('-'); return '<button type="button" data-avd="' + x.date + '" aria-pressed="' + (x.date === avDate) + '"' + (hasFree(x) ? '' : ' class="none"') + '>' + (+p[1]) + '/' + (+p[2]) + '<small>' + x.wd + '</small></button>'; }).join('') + '</div>';
+    var axis = '';
+    for (var t = T0; t <= T1; t += 60) axis += '<span class="avtick" style="left:' + ((t - T0) / span * 100) + '%">' + (t / 60) + '</span>';
+    h += '<div class="avrow"><div class="avname"></div><div class="avtrack avaxis">' + axis + '</div></div>';
+    D.mentors.forEach(function(m){
+      h += '<div class="avrow"><div class="avname">' + esc(m.name) + '</div><div class="avtrack">';
+      ((day.byMentor && day.byMentor[m.id]) || []).forEach(function(r){ var a = mins(r[0]), b = mins(r[1]); h += '<span class="avbusy" style="left:' + ((a - T0) / span * 100) + '%;width:' + ((b - a) / span * 100) + '%"></span>'; });
+      dayFree(day, m.id).forEach(function(f){
+        var ok = f[1] - f[0] >= D.lessonMin;
+        h += '<button type="button" class="avfree' + (ok ? '' : ' short') + '"' + (ok ? ' data-m="' + m.id + '" data-s="' + f[0] + '" data-e="' + f[1] + '"' : ' disabled')
+          + ' style="left:' + ((f[0] - T0) / span * 100) + '%;width:' + ((f[1] - f[0]) / span * 100) + '%" aria-label="' + esc(m.name) + 'さん ' + hmz(f[0]) + '〜' + hmz(f[1]) + ' 空き"></button>';
+      });
+      h += '</div></div>';
+    });
+    h += '<div class="avlegend"><span><i style="background:#3BA272"></i>空き（予約できます）</span><span><i style="background:#B9DFCA"></i>90分に満たない空き</span><span><i style="background:#CFCFCF"></i>授業・講座で埋まっています</span><span><i style="background:#fff;border:1px solid var(--line)"></i>メンターがいません</span></div>';
+    if (!hasFree(day)) h += '<p class="note">この日は予約できる空きがありません。ほかの日を選んでください。</p>';
+    el.innerHTML = h;
+  }
+  document.addEventListener('click', function(ev){
+    var b = ev.target.closest ? ev.target.closest('#av button') : null; if (!b) return;
+    if (b.dataset.avd) { avDate = b.dataset.avd; renderAv(); return; }
+    if (!b.dataset.m) return;
+    var r = b.getBoundingClientRect(), s = +b.dataset.s, e = +b.dataset.e;
+    var m = Math.floor((s + (ev.clientX - r.left) / r.width * (e - s)) / 30) * 30;
+    if (m + D.lessonMin > e) m = e - D.lessonMin;
+    if (m < s) m = s;
+    var t = hmz(m);
+    for (var k = 0; k < 3; k++) {
+      if (!document.getElementById('d' + k).value) {
+        document.getElementById('d' + k).value = avDate;
+        var sel = document.getElementById('t' + k);
+        if (![].some.call(sel.options, function(o){ return o.value === t; })) { var o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o); }
+        sel.value = t;
+        document.getElementById('fMentor').value = b.dataset.m;
+        for (var j = 0; j < 3; j++) hint(j);
+        toast('第' + (k + 1) + '希望に ' + label(avDate) + ' ' + t + '〜 を入れました');
+        return;
+      }
+    }
+    toast('希望は3つまでです。入れ直すときは日付を消してください');
+  });
 
   if (!TOKEN) fail('公式LINEで「授業」と送ると、このページの専用リンクが届きます。');
   else load();
