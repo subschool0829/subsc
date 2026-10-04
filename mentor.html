@@ -96,6 +96,23 @@
   .info .okk{background:var(--lesson);color:var(--lessonInk);font-weight:700}
   .chipb{border:1.5px solid var(--line);background:var(--bg);border-radius:10px;padding:4px 10px;font-weight:700;cursor:pointer;font-size:13px;text-align:left}
   .chipb small{display:block;font-weight:500;color:var(--sub);font-size:11px}
+  .vseg{display:inline-flex;border:1.5px solid var(--ink);border-radius:999px;overflow:hidden}
+  .vseg button{border:0;background:var(--bg);padding:5px 12px;font-weight:700;font-size:13px;cursor:pointer}
+  .vseg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+  .tl{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tlin{min-width:640px}
+  .tlrow{display:flex;align-items:stretch;margin-top:4px}
+  .tlname{flex:none;width:56px;font-size:12px;font-weight:700;display:flex;align-items:center;position:sticky;left:0;background:var(--bg);z-index:3;padding-right:4px;overflow:hidden}
+  .tltrack{position:relative;flex:1;height:36px;border-radius:6px;background-color:var(--soft);background-image:linear-gradient(to right,var(--line) 1px,transparent 1px);background-size:var(--hw) 100%;cursor:pointer}
+  .tlaxis .tltrack{height:16px;background:none;cursor:default}
+  .tltick{position:absolute;top:0;font-size:10px;color:var(--sub);transform:translateX(-50%)}
+  .tlshift{position:absolute;top:0;bottom:0;background:#FBE38A;border-radius:6px;pointer-events:none}
+  .tlles,.tlev{position:absolute;top:4px;bottom:4px;border:0;border-radius:6px;font-size:11px;font-weight:700;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;z-index:1;font-family:inherit}
+  .tlles{background:var(--lessonInk);color:#fff}
+  .tlles.cancel{background:#BDBDBD;text-decoration:line-through}
+  .tlles.warnb{box-shadow:0 0 0 2px var(--warn)}
+  .tlev{background:var(--event);color:var(--eventInk);box-shadow:inset 0 0 0 1px var(--eventInk)}
+  .tlev.off{opacity:.45;text-decoration:line-through}
   :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 </style>
 </head>
@@ -113,7 +130,7 @@
     </div>
     <div class="row" style="margin-bottom:8px">
       <div class="legend"><span><i style="background:var(--shift)"></i>在室予定</span><span><i style="background:var(--lesson)"></i>授業</span><span><i style="background:var(--event)"></i>行事</span></div>
-      <button class="btn" id="todayBtn">今日</button>
+      <div style="display:flex;gap:6px;align-items:center"><div class="vseg" id="vseg" role="group" aria-label="表示"><button data-v="list">リスト</button><button data-v="time">時間軸</button></div><button class="btn" id="todayBtn">今日</button></div>
     </div>
     <div id="days"></div>
   </section>
@@ -233,7 +250,8 @@
   }
 
   // ===== 週の予定 =====
-  function renderWeek(){
+  function renderWeek(){ if (VIEW === 'time') return renderTimeline(); renderList(); }
+  function renderList(){
     var to = addDays(weekFrom, 6);
     document.getElementById('weekLabel').textContent = label(weekFrom) + ' 〜 ' + label(to);
     var html = '';
@@ -282,6 +300,65 @@
   document.getElementById('todayBtn').onclick = function(){ weekFrom = D.today; reload(); };
   function reload(){ document.getElementById('days').innerHTML = '<div class="loading">読み込み中…</div>'; renderWeekLabelOnly(); return load(); }
   function renderWeekLabelOnly(){ document.getElementById('weekLabel').textContent = label(weekFrom) + ' 〜 ' + label(addDays(weekFrom, 6)); }
+
+  // ===== 時間軸ビュー =====
+  var VIEW = 'list';
+  try { VIEW = localStorage.getItem('subsc_view') || 'list'; } catch(e){}
+  function hm(m){ return ('0'+Math.floor(m/60)).slice(-2) + ':' + ('0'+(m%60)).slice(-2); }
+  function renderTimeline(){
+    var to = addDays(weekFrom, 6);
+    document.getElementById('weekLabel').textContent = label(weekFrom) + ' 〜 ' + label(to);
+    var T0 = 10*60, T1 = 22*60;
+    D.shifts.concat(D.lessons).concat(D.events).forEach(function(x){ T0 = Math.min(T0, Math.floor(mins(x.start)/60)*60); T1 = Math.max(T1, Math.ceil(mins(x.end)/60)*60); });
+    var span = T1 - T0;
+    function pos(s, e){ var a = Math.max(mins(s), T0), b = Math.min(mins(e), T1); return 'left:' + ((a-T0)/span*100) + '%;width:' + (Math.max(b-a, 0)/span*100) + '%'; }
+    var axis = '';
+    for (var h = T0; h <= T1; h += 60) axis += '<span class="tltick" style="left:' + ((h-T0)/span*100) + '%">' + (h/60) + '</span>';
+    var html = '<p class="muted" style="margin-bottom:8px">黄色はメンターの在室時間です。空いているところをタップすると、その時刻・そのメンターで授業を追加できます（横にスクロールできます）。</p>';
+    for (var i = 0; i < 7; i++) {
+      var d = addDays(weekFrom, i), w = wd(d);
+      html += '<div class="day' + (d === D.today ? ' today' : '') + '"><div class="dhead"><b class="' + (w==='日'?'sun':w==='土'?'sat':'') + '">' + label(d) + (d === D.today ? ' <span class="tag" style="background:var(--yellow)">今日</span>' : '') + '</b>'
+        + '<button class="add" data-add="' + d + '" aria-label="' + label(d) + 'に追加">＋</button></div>'
+        + '<div class="tl"><div class="tlin" style="--hw:' + (6000/span) + '%">'
+        + '<div class="tlrow tlaxis"><div class="tlname"></div><div class="tltrack">' + axis + '</div></div>';
+      var lessonsDay = D.lessons.filter(function(l){ return l.date === d; });
+      var rows = D.mentors.map(function(m){ return { id: m.id, name: m.name }; });
+      if (lessonsDay.some(function(l){ return !l.mentorId; })) rows.push({ id: '', name: '担当未定' });
+      rows.forEach(function(m){
+        html += '<div class="tlrow"><div class="tlname">' + esc(m.name) + '</div><div class="tltrack" data-track="1" data-date="' + d + '" data-mentor="' + m.id + '" data-t0="' + T0 + '" data-span="' + span + '">';
+        D.shifts.filter(function(s){ return s.date === d && s.mentorId === m.id; }).forEach(function(s){ html += '<div class="tlshift" style="' + pos(s.start, s.end) + '"></div>'; });
+        lessonsDay.filter(function(l){ return (l.mentorId || '') === m.id; }).forEach(function(l){
+          var cancel = l.status !== '予定', warn = !cancel && lessonWarnings(l).length;
+          html += '<button class="tlles' + (cancel ? ' cancel' : '') + (warn ? ' warnb' : '') + '" data-lesson="' + l.id + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + l.names) + '">' + l.start + ' ' + esc(l.names) + '</button>';
+        });
+        html += '</div></div>';
+      });
+      var evs = D.events.filter(function(e){ return e.date === d; });
+      if (evs.length) {
+        html += '<div class="tlrow"><div class="tlname">行事</div><div class="tltrack" style="cursor:default">';
+        evs.forEach(function(e){ html += '<button class="tlev' + (e.off ? ' off' : '') + '" data-event="' + e.id + '" data-date="' + d + '" style="' + pos(e.start, e.end) + '" title="' + esc(e.name) + '">' + esc(e.name) + '</button>'; });
+        html += '</div></div>';
+      }
+      html += '</div></div></div>';
+    }
+    document.getElementById('days').innerHTML = html;
+  }
+  document.getElementById('days').addEventListener('click', function(ev){
+    if (ev.target.closest('button')) return;
+    var tr = ev.target.closest('[data-track]'); if (!tr) return;
+    var r = tr.getBoundingClientRect();
+    var t0 = +tr.dataset.t0, span = +tr.dataset.span;
+    var m = Math.floor((t0 + (ev.clientX - r.left) / r.width * span) / 30) * 30;
+    m = Math.min(Math.max(m, t0), 22*60);
+    lessonForm(null, tr.dataset.date, { start: hm(m), mentorId: tr.dataset.mentor });
+  });
+  function syncVseg(){ [].forEach.call(document.querySelectorAll('#vseg button'), function(b){ b.setAttribute('aria-pressed', b.dataset.v === VIEW ? 'true' : 'false'); }); }
+  document.getElementById('vseg').onclick = function(ev){
+    var b = ev.target.closest('button'); if (!b) return;
+    VIEW = b.dataset.v; try { localStorage.setItem('subsc_view', VIEW); } catch(e){}
+    syncVseg(); if (D) renderWeek();
+  };
+  syncVseg();
 
   // ===== モーダル =====
   function openModal(html){ document.getElementById('sheet').innerHTML = html; document.getElementById('modal').classList.add('on'); var f = document.querySelector('#sheet input,#sheet select,#sheet button'); if (f) f.focus(); }
@@ -332,9 +409,10 @@
 
   // ----- 授業 -----
   var picked = [];
-  function lessonForm(l, d){
+  function lessonForm(l, d, preset){
     var isNew = !l;
-    l = l || { date: d, start: '17:00', end: addMin('17:00', LESSON_MIN), students: [], mentorId: D.me.id, content: '', status: '予定', memo: '' };
+    var ps = (preset && preset.start) || '17:00';
+    l = l || { date: d, start: ps, end: addMin(ps, LESSON_MIN), students: [], mentorId: preset ? preset.mentorId : D.me.id, content: '', status: '予定', memo: '' };
     picked = l.students.slice();
     openModal('<h3>授業' + (isNew ? 'を追加' : '') + '</h3>'
       + '<label class="f">日付<input type="date" id="lD" value="' + l.date + '"></label>'
