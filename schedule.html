@@ -33,6 +33,24 @@
   .nowm{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .mt{font-size:13px;font-weight:700;border-radius:999px;padding:2px 12px;background:#fff;color:var(--sub)}
   .mt.on{background:#0F6E56;color:#fff}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:16px 0 4px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+  .dd{padding:14px 0;border-bottom:1px solid var(--line)}
+  .dd:last-child{border-bottom:0}
+  .dd .dt{font-weight:900;font-size:17px;margin-bottom:4px}
+  .dd .dt small{font-size:12px;color:var(--sub);font-weight:700;margin-left:6px}
+  .dd .dt .td{font-size:11px;background:var(--yellow);border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:2px}
+  .dd .sun{color:#B3261E}.dd .sat{color:#185FA5}
+  .row{display:flex;align-items:center;margin-top:4px}
+  .nm{flex:none;width:56px;font-size:12px;font-weight:700;overflow:hidden}
+  .tr{position:relative;flex:1;height:30px;background-color:var(--soft);background-image:linear-gradient(to right,var(--line) 1px,transparent 1px);background-size:var(--hw) 100%;border-radius:6px}
+  .row.axis .tr{height:14px;background:none}
+  .tick{position:absolute;top:0;font-size:10px;color:var(--sub);transform:translateX(-50%)}
+  .tick:first-child{transform:none}
+  .tick:last-child{transform:translateX(-100%)}
+  .bar,.ev{position:absolute;top:3px;bottom:3px;border-radius:5px;font-size:11px;font-weight:700;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:24px;font-variant-numeric:tabular-nums}
+  .bar{background:var(--yellow);color:var(--ink)}
+  .ev{background:#E8EEF8;color:#28497A;box-shadow:inset 0 0 0 1px #28497A}
 </style>
 </head>
 <body>
@@ -41,7 +59,7 @@
   <header>
     <div class="brand">みんなのサブスク</div>
     <h1>メンター在室・行事</h1>
-    <p class="lead">今日から2週間の、メンターがいる時間と行事の予定です。予定は変わることがあります。</p>
+    <p class="lead">今日から2週間の、メンターごとの在室時間と行事の予定です。予定は変わることがあります。</p>
   </header>
   <div class="nowbox" id="now"></div>
   <div class="days" id="days"><p class="loading">読み込み中…</p></div>
@@ -61,21 +79,41 @@
       + '<div class="nowr"><span class="big">' + n.students + '</span>人が在室中</div>'
       + '<div class="nowm">' + n.mentors.map(function(m){ return '<span class="mt' + (m.in ? ' on' : '') + '">' + esc(m.name) + (m.in ? '　出勤中' : '　不在') + '</span>'; }).join('') + '</div>';
   }
+  function mins(t){ var p = String(t).split(':'); return (+p[0])*60 + (+p[1]); }
+  function renderDays(r){
+    var mentors = r.mentors || [{ id: '_', name: 'メンター' }];
+    var get = function(d, id){ return r.mentors ? ((d.byMentor || {})[id] || []) : d.presence; };
+    var T0 = 24*60, T1 = 0;
+    var ext = function(s, e){ T0 = Math.min(T0, Math.floor(mins(s)/60)*60); T1 = Math.max(T1, Math.ceil(mins(e)/60)*60); };
+    r.days.forEach(function(d){
+      mentors.forEach(function(m){ get(d, m.id).forEach(function(x){ ext(x[0], x[1]); }); });
+      d.events.forEach(function(e){ ext(e.start, e.end); });
+    });
+    if (T1 <= T0) { T0 = 16*60; T1 = 22*60; }
+    var span = T1 - T0, hw = 6000 / span;
+    function pos(s, e){ var a = Math.max(mins(s), T0), b = Math.min(mins(e), T1); return 'left:' + ((a - T0) / span * 100) + '%;width:' + (Math.max(b - a, 0) / span * 100) + '%'; }
+    var axis = '';
+    for (var h = T0; h <= T1; h += 60) axis += '<span class="tick" style="left:' + ((h - T0) / span * 100) + '%">' + (h / 60) + '</span>';
+    document.getElementById('days').innerHTML = '<div class="legend"><span><i style="background:var(--yellow)"></i>メンターがいる時間</span><span><i style="background:#E8EEF8;box-shadow:inset 0 0 0 1px #28497A"></i>行事</span></div>'
+      + r.days.map(function(d){
+        var p = d.date.split('-'), cls = d.wd === '日' ? 'sun' : d.wd === '土' ? 'sat' : '';
+        var rows = '<div class="row axis"><div class="nm"></div><div class="tr">' + axis + '</div></div>';
+        mentors.forEach(function(m){
+          rows += '<div class="row"><div class="nm">' + esc(m.name) + '</div><div class="tr" style="--hw:' + hw + '%">'
+            + get(d, m.id).map(function(x){ return '<span class="bar" style="' + pos(x[0], x[1]) + '" title="' + esc(m.name + ' ' + x[0] + '〜' + x[1]) + '">' + x[0] + '〜' + x[1] + '</span>'; }).join('') + '</div></div>';
+        });
+        rows += '<div class="row"><div class="nm">行事</div><div class="tr" style="--hw:' + hw + '%">'
+          + d.events.map(function(e){ return '<span class="ev" style="' + pos(e.start, e.end) + '" title="' + esc(e.start + '〜' + e.end + ' ' + e.name) + '">' + esc(e.name) + '</span>'; }).join('') + '</div></div>';
+        return '<div class="dd"><div class="dt ' + cls + '">' + (+p[1]) + '/' + (+p[2]) + '<small>' + d.wd + '曜</small>' + (d.date === r.today ? '<span class="td">今日</span>' : '') + '</div>' + rows + '</div>';
+      }).join('');
+  }
   function load(){
   return fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'sch_public' }) })
     .then(function(r){ return r.json(); })
     .then(function(r){
       if (!r.ok) throw new Error();
       renderNow(r.now);
-      document.getElementById('days').innerHTML = r.days.map(function(d){
-        var p = d.date.split('-');
-        var cls = d.wd === '日' ? 'sun' : d.wd === '土' ? 'sat' : '';
-        var lines = '';
-        if (d.presence.length) lines += '<div class="line"><span class="k m">メンター</span><span class="tm">' + d.presence.map(function(x){ return x[0] + '〜' + x[1]; }).join('、') + '</span></div>';
-        d.events.forEach(function(e){ lines += '<div class="line"><span class="k e">行事</span><span><span class="tm">' + e.start + '〜' + e.end + '</span>　' + esc(e.name) + '</span></div>'; });
-        if (!lines) lines = '<div class="none">メンターの在室予定はまだありません</div>';
-        return '<div class="d' + (d.date === r.today ? ' today' : '') + '"><div class="dt ' + cls + '">' + (+p[1]) + '/' + (+p[2]) + '<small>' + d.wd + '曜' + (d.date === r.today ? '・今日' : '') + '</small></div><div>' + lines + '</div></div>';
-      }).join('');
+      renderDays(r);
     })
     .catch(function(){ document.getElementById('days').innerHTML = '<p class="none">予定を読み込めませんでした。時間をおいて開き直してください。</p>'; });
   }
