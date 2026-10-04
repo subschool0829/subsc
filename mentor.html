@@ -111,6 +111,8 @@
   .tlshift{position:absolute;top:0;bottom:0;background:#FBE38A;border-radius:6px;pointer-events:none}
   .tlles,.tlev{position:absolute;top:4px;bottom:4px;border:0;border-radius:6px;font-size:11px;font-weight:700;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;cursor:pointer;z-index:1;font-family:inherit}
   .tlles{background:var(--lessonInk);color:#fff}
+  .tlles.kouza{background:#534AB7}
+  .item.lesson.kouza{background:#EEEDFE;color:#3C3489}
   .tlles.cancel{background:#BDBDBD;text-decoration:line-through}
   .tlles.warnb{box-shadow:0 0 0 2px var(--warn)}
   .tlev{background:var(--event);color:var(--eventInk);box-shadow:inset 0 0 0 1px var(--eventInk)}
@@ -135,7 +137,7 @@
       <button class="btn" id="nextW" aria-label="次の週">▶</button>
     </div>
     <div class="row" style="margin-bottom:8px">
-      <div class="legend"><span><i style="background:var(--shift)"></i>在室予定</span><span><i style="background:var(--lesson)"></i>授業</span><span><i style="background:var(--event)"></i>行事</span></div>
+      <div class="legend"><span><i style="background:var(--shift)"></i>在室予定</span><span><i style="background:var(--lesson)"></i>授業</span><span><i style="background:#EEEDFE"></i>講座</span><span><i style="background:var(--event)"></i>行事</span></div>
       <div style="display:flex;gap:6px;align-items:center"><div class="vseg" id="vseg" role="group" aria-label="表示"><button data-v="list">リスト</button><button data-v="time">時間軸</button></div><button class="btn" id="todayBtn">今日</button></div>
     </div>
     <div id="days"></div>
@@ -250,7 +252,7 @@
       if (!overlap(l.start, l.end, o.start, o.end)) return;
       var same = (l.students || []).filter(function(id){ return o.students.indexOf(id) >= 0; });
       if (same.length) w.push('同じ生徒の授業が ' + o.start + '〜 にもあります');
-      else if (o.mentorId === l.mentorId) w.push(o.start + '〜 の授業（' + o.names + '）と重なっています。まとめるなら合計4人まで');
+      else if (o.mentorId === l.mentorId) w.push(o.start + '〜 の' + (o.kind === '講座' ? '講座（' + o.title : '授業（' + o.names) + '）と重なっています' + (o.kind === '講座' || l.kind === '講座' ? '' : '。まとめるなら合計4人まで'));
     });
     return w;
   }
@@ -278,7 +280,7 @@
         } else if (it.k === 'lesson') {
           var cancel = o.status !== '予定';
           var ws = cancel ? [] : lessonWarnings(o);
-          html += '<button class="item lesson' + (cancel ? ' cancel' : '') + '" data-lesson="' + o.id + '"><span class="t">' + o.start + '〜' + o.end + '</span>授業　' + esc(o.names)
+          html += '<button class="item lesson' + (o.kind === '講座' ? ' kouza' : '') + (cancel ? ' cancel' : '') + '" data-lesson="' + o.id + '"><span class="t">' + o.start + '〜' + o.end + '</span>' + (o.kind === '講座' ? '講座　' : '授業　') + esc(o.title || o.names)
             + (o.count >= 2 ? '<span class="tag">' + o.count + '人</span>' : '') + (cancel ? '<span class="tag">' + esc(o.status) + '</span>' : '')
             + '<small>' + (o.content ? esc(o.content) + '　' : '') + '担当：' + esc(o.mentor || '未定') + '</small>'
             + ws.map(function(x){ return '<span class="warn">⚠ ' + esc(x) + '</span>'; }).join('') + '</button>';
@@ -342,7 +344,7 @@
         D.shifts.filter(function(s){ return s.date === d && s.mentorId === m.id; }).forEach(function(s){ html += '<div class="tlshift" style="' + pos(s.start, s.end) + '"></div>'; });
         lessonsDay.filter(function(l){ return (l.mentorId || '') === m.id; }).forEach(function(l){
           var cancel = l.status !== '予定', warn = !cancel && lessonWarnings(l).length;
-          html += '<button class="tlles' + (cancel ? ' cancel' : '') + (warn ? ' warnb' : '') + '" data-lesson="' + l.id + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + l.names) + '">' + l.start + ' ' + esc(l.names) + '</button>';
+          html += '<button class="tlles' + (l.kind === '講座' ? ' kouza' : '') + (cancel ? ' cancel' : '') + (warn ? ' warnb' : '') + '" data-lesson="' + l.id + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + (l.title || l.names)) + '">' + l.start + ' ' + esc(l.title || l.names) + '</button>';
         });
         if (m.id) evsDay.filter(function(e){ return e.mentorId === m.id; }).forEach(function(e){ html += evBtn(e); });
         html += '</div></div>';
@@ -407,7 +409,7 @@
     var ns = Math.min(Math.max(drag.startMin + delta, TL.T0), TL.T0 + TL.span - drag.dur);
     drag.ns = ns;
     drag.b.style.left = ((ns - TL.T0) / TL.span * 100) + '%';
-    drag.b.textContent = hm(ns) + ' ' + (drag.isL ? drag.o.names : drag.o.name);
+    drag.b.textContent = hm(ns) + ' ' + (drag.isL ? (drag.o.title || drag.o.names) : evText(drag.o));
     {
       drag.b.style.transform = 'translateY(' + dy + 'px)';
       drag.b.style.pointerEvents = 'none';
@@ -437,15 +439,15 @@
   document.addEventListener('pointercancel', function(){ if (drag) { drag = null; clearDrop(); renderWeek(); } });
   function moveLessonConfirm(l, nd, ns, ne, nm){
     var ws = lessonWarnings({ id: l.id, date: nd, start: ns, end: ne, mentorId: nm, students: l.students }, l.id);
-    openModal('<h3>授業を移動</h3><p><b>' + esc(l.names) + '</b></p>'
+    openModal('<h3>' + (l.kind === '講座' ? '講座' : '授業') + 'を移動</h3><p><b>' + esc(l.title || l.names) + '</b></p>'
       + '<p class="muted">' + label(l.date) + ' ' + l.start + '〜' + l.end + '（' + esc(mentorName(l.mentorId)) + '）</p>'
       + '<p style="font-weight:900;margin:6px 0">→ ' + label(nd) + ' ' + ns + '〜' + ne + '（' + esc(mentorName(nm)) + '）</p>'
       + ws.map(function(w){ return '<span class="warn">⚠ ' + esc(w) + '</span>'; }).join('')
-      + '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="mvNt" style="width:auto;display:inline">生徒・保護者にLINEで変更をお知らせする</label>'
+      + (l.kind === '講座' ? '' : '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="mvNt" style="width:auto;display:inline">生徒・保護者にLINEで変更をお知らせする</label>')
       + '<div class="acts"><div class="r"><button class="btn" id="mvNo">やめる</button><button class="btn pri" id="mvOk" data-label="移動する">移動する</button></div></div>');
     document.getElementById('mvNo').onclick = closeModal;
     document.getElementById('mvOk').onclick = function(){
-      save('sch_lesson_save', { id: l.id, date: nd, start: ns, end: ne, students: l.students, mentorId: nm, content: l.content, status: l.status, memo: l.memo, notify: document.getElementById('mvNt').checked }, '授業を移動しました', this);
+      save('sch_lesson_save', { id: l.id, date: nd, start: ns, end: ne, students: l.students, mentorId: nm, content: l.content, status: l.status, memo: l.memo, kind: l.kind, target: l.target, notify: !!(document.getElementById('mvNt') && document.getElementById('mvNt').checked) }, '移動しました', this);
     };
   }
   function moveEventConfirm(e, ns, ne, nm){
@@ -494,53 +496,123 @@
     document.getElementById('cE').onclick = function(){ eventForm(null, d); };
   }
 
+  // ----- くり返し -----
+  var HOLIDAYS = {};
+  ['2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06','2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23','2026-10-12','2026-11-03','2026-11-23',
+   '2027-01-01','2027-01-11','2027-02-11','2027-02-23','2027-03-21','2027-03-22','2027-04-29','2027-05-03','2027-05-04','2027-05-05','2027-07-19','2027-08-11','2027-09-20','2027-09-23','2027-10-11','2027-11-03','2027-11-23']
+    .forEach(function(d){ HOLIDAYS[d] = true; });
+  var REPS = [['none','なし'],['daily','毎日'],['weekday','平日'],['weekend','土日祝'],['weekly','毎週']];
+  function repeatDates(start, until, mode){
+    if (!start) return [];
+    if (mode === 'none' || !until || until < start) return [start];
+    var out = [], sw = parse(start).getUTCDay();
+    for (var d = start; d <= until && out.length < 200; d = addDays(d, 1)) {
+      var w = parse(d).getUTCDay(), hol = !!HOLIDAYS[d];
+      if (mode === 'daily' || (mode === 'weekday' && w >= 1 && w <= 5 && !hol) || (mode === 'weekend' && (w === 0 || w === 6 || hol)) || (mode === 'weekly' && w === sw)) out.push(d);
+    }
+    return out;
+  }
+  function delSeries(text, action, id, series){
+    if (!series) return confirmDel(text, action, { id: id });
+    openModal('<h3>削除</h3><p>' + esc(text) + '</p><div class="choice"><button style="background:var(--soft)" id="dOne">この日だけ削除する</button><button style="background:var(--warnBg);color:var(--warn)" id="dAfter">この日以降のくり返しをすべて削除する</button></div>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button></div></div>');
+    document.getElementById('dOne').onclick = function(){ save(action, { id: id }, '削除しました', this); };
+    document.getElementById('dAfter').onclick = function(){ save(action, { id: id, scope: 'after' }, '削除しました', this); };
+  }
+
   // ----- 在室予定 -----
+  var fRep = 'none';
   function shiftForm(s, d){
     var isNew = !s;
     s = s || { date: d, start: '16:00', end: '22:00', mentorId: D.me.id, memo: '' };
+    fRep = 'none';
     var mentorSel = D.me.admin
       ? '<label class="f">メンター<select id="fM">' + D.mentors.map(function(m){ return '<option value="' + m.id + '"' + (m.id === s.mentorId ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>'
       : '<p class="muted" style="margin-top:8px">' + esc(D.me.name) + 'さんの予定</p>';
     openModal('<h3>在室予定' + (isNew ? 'を追加' : '') + '</h3>' + mentorSel
-      + '<label class="f">日付<input type="date" id="fD" value="' + s.date + '"></label>'
+      + '<label class="f">' + (isNew ? '日付（くり返す場合は開始日）' : '日付') + '<input type="date" id="fD" value="' + s.date + '"></label>'
       + '<div class="two"><label class="f">開始<input type="time" id="fS" value="' + s.start + '" step="300"></label><label class="f">終了<input type="time" id="fE" value="' + s.end + '" step="300"></label></div>'
+      + (isNew ? '<div class="f" style="margin-top:12px;font-size:13px;font-weight:700;color:var(--sub)">くり返し<div class="seg" id="fR">' + REPS.map(function(r){ return '<button type="button" data-v="' + r[0] + '">' + r[1] + '</button>'; }).join('') + '</div></div>'
+        + '<label class="f" id="fUW">いつまで<input type="date" id="fU" value="' + addDays(s.date, 27) + '"></label><p class="muted" id="fCnt" style="margin-top:6px"></p>' : '')
+      + (!isNew && s.series ? '<p class="muted" style="margin-top:8px">くり返し登録の1日分です。ここでの変更はこの日だけに反映されます。</p>' : '')
       + '<label class="f">メモ（任意）<input id="fN" value="' + esc(s.memo) + '" maxlength="100"></label>'
       + '<div class="acts">' + (isNew ? '' : '<button class="btn danger" id="fDel">削除</button>')
       + '<div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="fOk" data-label="保存">保存</button></div></div>');
+    function upd(){
+      if (!isNew) return;
+      [].forEach.call(document.querySelectorAll('#fR button'), function(b){ b.setAttribute('aria-pressed', b.dataset.v === fRep ? 'true' : 'false'); });
+      document.getElementById('fUW').style.display = fRep === 'none' ? 'none' : '';
+      var n = repeatDates(val('fD'), val('fU'), fRep).length;
+      document.getElementById('fCnt').textContent = fRep === 'none' ? '' : n + '日分を登録します' + (fRep === 'weekend' || fRep === 'weekday' ? '（祝日は土日祝として扱います）' : '');
+    }
+    if (isNew) {
+      document.getElementById('fR').onclick = function(ev){ var b = ev.target.closest('button'); if (b) { fRep = b.dataset.v; upd(); } };
+      ['fD','fU'].forEach(function(id){ document.getElementById(id).addEventListener('change', upd); });
+      upd();
+    }
     document.getElementById('fOk').onclick = function(){
-      save('sch_shift_save', { id: isNew ? '' : s.id, date: val('fD'), start: val('fS'), end: val('fE'), memo: val('fN'), mentorId: D.me.admin ? val('fM') : D.me.id }, '在室予定を保存しました', this);
+      var dates = isNew ? repeatDates(val('fD'), val('fU'), fRep) : null;
+      if (isNew && !dates.length) { toast('くり返しの条件に合う日がありません'); return; }
+      save('sch_shift_save', { id: isNew ? '' : s.id, date: val('fD'), dates: dates, start: val('fS'), end: val('fE'), memo: val('fN'), mentorId: D.me.admin ? val('fM') : D.me.id }, isNew && dates.length > 1 ? dates.length + '日分の在室予定を登録しました' : '在室予定を保存しました', this);
     };
-    if (!isNew) document.getElementById('fDel').onclick = function(){ confirmDel('この在室予定を削除しますか？', 'sch_shift_delete', { id: s.id }); };
+    if (!isNew) document.getElementById('fDel').onclick = function(){ delSeries('この在室予定を削除しますか？', 'sch_shift_delete', s.id, s.series); };
   }
 
-  // ----- 授業 -----
-  var picked = [];
+  // ----- 授業・講座 -----
+  var picked = [], lKind = '個別';
+  var TARGETS = ['小学生','中1','中2','中3','高1','高2','高3','高校生','全学年'];
   function lessonForm(l, d, preset){
     var isNew = !l;
     var ps = (preset && preset.start) || '17:00';
-    l = l || { date: d, start: ps, end: addMin(ps, LESSON_MIN), students: [], mentorId: preset ? preset.mentorId : D.me.id, content: '', status: '予定', memo: '' };
+    l = l || { date: d, start: ps, end: addMin(ps, LESSON_MIN), students: [], mentorId: preset ? preset.mentorId : D.me.id, content: '', status: '予定', memo: '', kind: '個別', target: '' };
+    lKind = l.kind || '個別';
     picked = l.students.slice();
-    openModal('<h3>授業' + (isNew ? 'を追加' : '') + '</h3>'
-      + '<label class="f">日付<input type="date" id="lD" value="' + l.date + '"></label>'
+    openModal('<h3>' + (isNew ? '授業・講座を追加' : (lKind === '講座' ? '講座' : '授業')) + '</h3>'
+      + (isNew ? '<div class="seg" id="lK" style="margin-bottom:4px"><button type="button" data-v="個別">個別授業</button><button type="button" data-v="講座">講座（集団）</button></div>' : '')
+      + '<label class="f">' + (isNew ? '日付（くり返す場合は初回）' : '日付') + '<input type="date" id="lD" value="' + l.date + '"></label>'
       + '<div class="two"><label class="f">開始<input type="time" id="lS" value="' + l.start + '" step="300"></label><label class="f">終了<input type="time" id="lE" value="' + l.end + '" step="300"></label></div>'
-      + '<label class="f">生徒（最大4人）<input id="lQ" placeholder="名前で検索" autocomplete="off"></label>'
+      + '<label class="f" id="lGW">対象<select id="lG"><option value="">選ぶ</option>' + TARGETS.map(function(t){ return '<option' + (t === l.target ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></label>'
+      + '<label class="f"><span id="lQL">生徒（最大4人）</span><input id="lQ" placeholder="名前で検索" autocomplete="off"></label>'
       + '<div class="chips" id="lChips"></div><div class="picker" id="lPick"></div>'
       + '<label class="f">担当<select id="lM"><option value="">未定</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '"' + (m.id === l.mentorId ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>'
-      + '<label class="f">内容（任意）<input id="lC" value="' + esc(l.content) + '" maxlength="60" placeholder="例：数学　関数"></label>'
+      + '<label class="f"><span id="lCL">内容（任意）</span><input id="lC" value="' + esc(l.content) + '" maxlength="60"></label>'
+      + (isNew ? '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="lRp" style="width:auto;display:inline">毎週くり返す</label>'
+        + '<label class="f" id="lUW" style="display:none">いつまで<input type="date" id="lU" value="' + addDays(l.date, 7 * 12) + '"></label><p class="muted" id="lCnt" style="margin-top:6px"></p>' : '')
+      + (!isNew && l.series ? '<p class="muted" style="margin-top:8px">毎週くり返しの1回分です。ここでの変更はこの回だけに反映されます。</p>' : '')
       + (isNew ? '' : '<label class="f">状態<select id="lT">' + STATUS.map(function(s){ return '<option' + (s === l.status ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></label>')
       + '<label class="f">メモ（任意）<textarea id="lN" maxlength="200">' + esc(l.memo) + '</textarea></label>'
-      + (isNew ? '' : '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="lNt" style="width:auto;display:inline">日時・担当の変更を生徒・保護者にLINEでお知らせする</label>')
+      + (isNew || lKind === '講座' ? '' : '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="lNt" style="width:auto;display:inline">日時・担当の変更を生徒・保護者にLINEでお知らせする</label>')
       + '<div id="lWarn"></div>'
       + '<div class="acts">' + (isNew ? '' : '<button class="btn danger" id="lDel">削除</button>')
       + '<div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="lOk" data-label="保存">保存</button></div></div>'
       + (isNew ? '' : '<p class="muted" style="margin-top:10px">キャンセルのときは削除せず「状態」を変えると、授業料の集計に反映されます。</p>'));
+    function kindUI(){
+      var k = lKind === '講座';
+      [].forEach.call(document.querySelectorAll('#lK button'), function(b){ b.setAttribute('aria-pressed', b.dataset.v === lKind ? 'true' : 'false'); });
+      document.getElementById('lGW').style.display = k ? '' : 'none';
+      document.getElementById('lQL').textContent = k ? '参加者（任意・集計用。非会員は2,000円）' : '生徒（最大4人）';
+      document.getElementById('lCL').textContent = k ? '科目・内容（例：数学）' : '内容（任意）';
+      document.getElementById('lC').placeholder = k ? '例：数学' : '例：数学　関数';
+      refreshLesson(l.id);
+    }
+    function repUI(){
+      var on = document.getElementById('lRp').checked;
+      document.getElementById('lUW').style.display = on ? '' : 'none';
+      var n = repeatDates(val('lD'), val('lU'), 'weekly').length;
+      document.getElementById('lCnt').textContent = on ? n + '回分を登録します' : '';
+    }
     var startEl = document.getElementById('lS'), endEl = document.getElementById('lE');
     startEl.addEventListener('change', function(){ if (startEl.value) endEl.value = addMin(startEl.value, LESSON_MIN); refreshLesson(l.id); });
     ['lD','lE','lM'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ refreshLesson(l.id); }); });
+    if (isNew) {
+      document.getElementById('lK').onclick = function(ev){ var b = ev.target.closest('button'); if (b) { lKind = b.dataset.v; if (lKind === '個別' && picked.length > 4) picked = picked.slice(0, 4); kindUI(); } };
+      document.getElementById('lRp').onchange = repUI;
+      ['lD','lU'].forEach(function(id){ document.getElementById(id).addEventListener('change', repUI); });
+    }
     document.getElementById('lQ').addEventListener('input', function(){ renderPicker(); });
     document.getElementById('lPick').addEventListener('click', function(ev){
       var b = ev.target.closest('button[data-sid]'); if (!b) return;
-      if (picked.length >= 4) { toast('一度に受講できるのは4人までです'); return; }
+      if (lKind === '個別' && picked.length >= 4) { toast('一度に受講できるのは4人までです'); return; }
       picked.push(b.dataset.sid); document.getElementById('lQ').value = ''; refreshLesson(l.id);
     });
     document.getElementById('lChips').addEventListener('click', function(ev){
@@ -548,31 +620,34 @@
       picked = picked.filter(function(x){ return x !== b.dataset.rm; }); refreshLesson(l.id);
     });
     document.getElementById('lOk').onclick = function(){
-      if (!picked.length) { toast('生徒を選んでください'); return; }
-      save('sch_lesson_save', { id: isNew ? '' : l.id, date: val('lD'), start: val('lS'), end: val('lE'), students: picked, mentorId: val('lM'), content: val('lC'), status: isNew ? '予定' : val('lT'), memo: val('lN'), notify: !isNew && document.getElementById('lNt').checked }, '授業を保存しました', this);
+      if (lKind === '個別' && !picked.length) { toast('生徒を選んでください'); return; }
+      if (lKind === '講座' && !val('lG')) { toast('講座の対象を選んでください'); return; }
+      var dates = isNew && document.getElementById('lRp').checked ? repeatDates(val('lD'), val('lU'), 'weekly') : null;
+      var nt = document.getElementById('lNt');
+      save('sch_lesson_save', { id: isNew ? '' : l.id, kind: lKind, target: val('lG'), date: val('lD'), dates: dates, start: val('lS'), end: val('lE'), students: picked, mentorId: val('lM'), content: val('lC'), status: isNew ? '予定' : val('lT'), memo: val('lN'), notify: !!(nt && nt.checked) },
+        dates && dates.length > 1 ? dates.length + '回分を登録しました' : '保存しました', this);
     };
-    if (!isNew) document.getElementById('lDel').onclick = function(){ confirmDel('この授業を削除しますか？\n（キャンセルの場合は「状態」を変えてください）', 'sch_lesson_delete', { id: l.id }); };
-    refreshLesson(l.id);
+    if (!isNew) document.getElementById('lDel').onclick = function(){ delSeries('この' + (lKind === '講座' ? '講座' : '授業') + 'を削除しますか？（キャンセルの場合は「状態」を変えてください）', 'sch_lesson_delete', l.id, l.series); };
+    kindUI();
   }
   function studentName(id){ var s = find(D.students, id); return s ? s.name : id; }
   function renderPicker(){
     var q = val('lQ').replace(/\s/g, '');
     var list = D.students.filter(function(s){ return picked.indexOf(s.id) < 0 && (!q || s.name.replace(/\s/g, '').indexOf(q) >= 0); });
     var el = document.getElementById('lPick');
-    if (picked.length >= 4) { el.innerHTML = '<div class="none">4人選択済みです</div>'; return; }
+    if (lKind === '個別' && picked.length >= 4) { el.innerHTML = '<div class="none">4人選択済みです</div>'; return; }
     el.innerHTML = list.length ? list.slice(0, 60).map(function(s){ return '<button type="button" data-sid="' + s.id + '">' + esc(s.name) + '</button>'; }).join('') : '<div class="none">該当する生徒がいません</div>';
   }
   function refreshLesson(id){
     document.getElementById('lChips').innerHTML = picked.map(function(sid){ return '<span class="chip">' + esc(studentName(sid)) + '<button type="button" data-rm="' + sid + '" aria-label="外す">×</button></span>'; }).join('');
     renderPicker();
-    var cur = { id: id, date: val('lD'), start: val('lS'), end: val('lE'), mentorId: val('lM'), students: picked };
+    var cur = { id: id, kind: lKind, date: val('lD'), start: val('lS'), end: val('lE'), mentorId: val('lM'), students: picked };
     var ws = (cur.date && cur.start && cur.end) ? lessonWarnings(cur, id) : [];
-    if (picked.length >= 2) ws.unshift(picked.length + '人で受講（2人以上の料金）');
-    document.getElementById('lWarn').innerHTML = ws.map(function(w, i){
-      var info = picked.length >= 2 && i === 0;
-      return '<span class="warn"' + (info ? ' style="background:var(--lesson);color:var(--lessonInk)"' : '') + '>' + (info ? '' : '⚠ ') + esc(w) + '</span>';
-    }).join('');
+    var info = lKind === '個別' && picked.length >= 2 ? picked.length + '人で受講（2人以上の料金）' : lKind === '講座' && picked.length ? '参加者 ' + picked.length + '人' : '';
+    document.getElementById('lWarn').innerHTML = (info ? '<span class="warn" style="background:var(--lesson);color:var(--lessonInk)">' + esc(info) + '</span>' : '')
+      + ws.map(function(w){ return '<span class="warn">⚠ ' + esc(w) + '</span>'; }).join('');
   }
+
 
   // ----- 行事 -----
   function eventDayMenu(eid, d){
@@ -598,11 +673,8 @@
     var isNew = !e;
     e = e || { name: '', repeat: d ? '単発' : '毎週', weekday: d ? wd(d) : '水', date: d || D.today, start: '19:00', end: '20:30', public: true, memo: '', mentorId: '', target: '' };
     evRepeat = e.repeat;
-    openModal('<h3>行事・講座' + (isNew ? 'を追加' : 'の設定') + '</h3>'
-      + '<label class="f">名前<input id="eN" value="' + esc(e.name) + '" maxlength="40" placeholder="例：数学講座、英語勉強会"></label>'
-      + '<div class="two"><label class="f">対象<select id="eTg">' + ['', '小学生', '中1', '中2', '中3', '高校生', '全学年'].map(function(t){ return '<option value="' + t + '"' + (t === (e.target || '') ? ' selected' : '') + '>' + (t || 'なし') + '</option>'; }).join('') + '</select></label>'
-      + '<label class="f">担当<select id="eMt"><option value="">なし</option>' + mentorOpts(e.mentorId) + '</select></label></div>'
-      + '<p class="muted" style="margin-top:6px">担当を選ぶと、時間軸でそのメンターの行に表示されます（講座など）。生徒への通知は送られません。</p>'
+    openModal('<h3>行事' + (isNew ? 'を追加' : 'の設定') + '</h3>'
+      + '<label class="f">名前<input id="eN" value="' + esc(e.name) + '" maxlength="40" placeholder="例：英語勉強会、保護者会"></label>'
       + '<div class="f" style="margin-top:12px;font-size:13px;font-weight:700;color:var(--sub)">くり返し<div class="seg" id="eR"><button type="button" data-v="毎週">毎週</button><button type="button" data-v="単発">この日だけ</button></div></div>'
       + '<label class="f" id="eWW">曜日<select id="eW">' + WD.map(function(w){ return '<option' + (w === e.weekday ? ' selected' : '') + '>' + w + '</option>'; }).join('') + '</select></label>'
       + '<label class="f" id="eDW">日付<input type="date" id="eD" value="' + (e.date || D.today) + '"></label>'
@@ -619,7 +691,7 @@
     document.getElementById('eR').onclick = function(ev){ var b = ev.target.closest('button'); if (b) { evRepeat = b.dataset.v; seg(); } };
     seg();
     document.getElementById('eOk').onclick = function(){
-      save('sch_event_save', { id: isNew ? '' : e.id, name: val('eN'), repeat: evRepeat, weekday: val('eW'), date: val('eD'), start: val('eS'), end: val('eE'), public: document.getElementById('eP').checked, memo: val('eM'), mentorId: val('eMt'), target: val('eTg') }, '保存しました', this);
+      save('sch_event_save', { id: isNew ? '' : e.id, name: val('eN'), repeat: evRepeat, weekday: val('eW'), date: val('eD'), start: val('eS'), end: val('eE'), public: document.getElementById('eP').checked, memo: val('eM'), mentorId: e.mentorId || '', target: e.target || '' }, '保存しました', this);
     };
     if (!isNew) document.getElementById('eDel').onclick = function(){ confirmDel('「' + e.name + '」を削除しますか？\n（毎週の行事は、すべての週から消えます）', 'sch_event_delete', { id: e.id }); };
   }
