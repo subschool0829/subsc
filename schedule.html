@@ -51,6 +51,8 @@
   .bar,.ev{position:absolute;top:3px;bottom:3px;border-radius:5px;font-size:11px;font-weight:700;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:24px;font-variant-numeric:tabular-nums}
   .bar{background:var(--yellow);color:var(--ink)}
   .ev{background:#E8EEF8;color:#28497A;box-shadow:inset 0 0 0 1px #28497A}
+  .ls{position:absolute;top:3px;bottom:3px;border-radius:5px;font-size:11px;font-weight:700;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:24px;background:#0F6E56;color:#fff;z-index:1}
+  .ls.k{background:#534AB7}
 </style>
 </head>
 <body>
@@ -88,19 +90,21 @@
     r.days.forEach(function(d){
       mentors.forEach(function(m){ get(d, m.id).forEach(function(x){ ext(x[0], x[1]); }); });
       d.events.forEach(function(e){ ext(e.start, e.end); });
+      (d.lessons || []).forEach(function(l){ ext(l.start, l.end); });
     });
     if (T1 <= T0) { T0 = 16*60; T1 = 22*60; }
     var span = T1 - T0, hw = 6000 / span;
     function pos(s, e){ var a = Math.max(mins(s), T0), b = Math.min(mins(e), T1); return 'left:' + ((a - T0) / span * 100) + '%;width:' + (Math.max(b - a, 0) / span * 100) + '%'; }
     var axis = '';
     for (var h = T0; h <= T1; h += 60) axis += '<span class="tick" style="left:' + ((h - T0) / span * 100) + '%">' + (h / 60) + '</span>';
-    document.getElementById('days').innerHTML = '<div class="legend"><span><i style="background:var(--yellow)"></i>メンターがいる時間</span><span><i style="background:#E8EEF8;box-shadow:inset 0 0 0 1px #28497A"></i>行事</span></div>'
+    document.getElementById('days').innerHTML = '<div class="legend"><span><i style="background:var(--yellow)"></i>メンターがいる時間</span><span><i style="background:#0F6E56"></i>授業</span><span><i style="background:#534AB7"></i>講座</span><span><i style="background:#E8EEF8;box-shadow:inset 0 0 0 1px #28497A"></i>行事</span></div>'
       + r.days.map(function(d){
         var p = d.date.split('-'), cls = d.wd === '日' ? 'sun' : d.wd === '土' ? 'sat' : '';
         var rows = '<div class="row axis"><div class="nm"></div><div class="tr">' + axis + '</div></div>';
         mentors.forEach(function(m){
           rows += '<div class="row"><div class="nm">' + esc(m.name) + '</div><div class="tr" style="--hw:' + hw + '%">'
-            + get(d, m.id).map(function(x){ return '<span class="bar" style="' + pos(x[0], x[1]) + '" title="' + esc(m.name + ' ' + x[0] + '〜' + x[1]) + '">' + x[0] + '〜' + x[1] + '</span>'; }).join('') + '</div></div>';
+            + get(d, m.id).map(function(x){ return '<span class="bar" style="' + pos(x[0], x[1]) + '" title="' + esc(m.name + ' ' + x[0] + '〜' + x[1]) + '">' + x[0] + '〜' + x[1] + '</span>'; }).join('')
+            + (d.lessons || []).filter(function(l){ return l.m === m.id; }).map(function(l){ var k = l.kind === '講座'; return '<span class="ls' + (k ? ' k' : '') + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + (k ? l.title : '授業')) + '">' + (k ? esc(l.title) : '') + '</span>'; }).join('') + '</div></div>';
         });
         rows += '<div class="row"><div class="nm">行事</div><div class="tr" style="--hw:' + hw + '%">'
           + d.events.map(function(e){ return '<span class="ev" style="' + pos(e.start, e.end) + '" title="' + esc(e.start + '〜' + e.end + ' ' + e.name) + '">' + esc(e.name) + '</span>'; }).join('') + '</div></div>';
