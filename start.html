@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>はじめての方へ｜みんなのサブスク</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .path{background:var(--soft);border-radius:16px;padding:20px;margin:16px 0}
+  .path h2{margin:0 0 6px;padding:0;border:0;font-size:20px}
+  .path h2::before{display:none}
+  .path p{margin:0 0 4px;font-size:15px}
+  .path .cta{margin:14px 0 6px}
+  .cta.line{background:#fff}
+  .links{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;font-weight:700;margin-top:6px}
+  .links a{color:var(--ink)}
+  .num{display:inline-block;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;text-align:center;line-height:28px;font-size:15px;margin-right:8px;vertical-align:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="tabs"><a href="annai.html">運営案内</a><a href="ryokin.html">料金表</a><a href="schedule.html">在室・行事</a></nav>
+  <header>
+    <div class="brand">みんなのサブスク</div>
+    <h1>はじめての方へ</h1>
+    <p class="lead">入会のお申し込み、体験、ご質問はこちらから。小学5年生から高校3年生まで、月額で通い放題の自習室です。</p>
+  </header>
+
+  <section class="path">
+    <h2><span class="num">1</span>入会する（在籍登録）</h2>
+    <p>保護者の方がフォームにご入力ください。すでに通っている方の登録もこちらです。</p>
+    <a class="cta" href="https://forms.gle/5XpmWff4jCFtaGeZ6">在籍登録フォームへ<span>5分ほどで入力できます</span></a>
+    <div class="links"><a href="annai.html">運営案内を読む</a><a href="ryokin.html">料金表を見る</a></div>
+  </section>
+
+  <section class="path">
+    <h2><span class="num">2</span>体験してみたい</h2>
+    <p>ボタンを押すと公式LINEのトークが開きます。お名前・学年・ご希望の日時を書いて送ってください。日程をご相談してお返事します。</p>
+    <a class="cta line" id="trial" href="#">LINEで体験を申し込む<span>トークに下書きが入ります</span></a>
+  </section>
+
+  <section class="path">
+    <h2><span class="num">3</span>質問・お問い合わせ</h2>
+    <p>料金やご利用のこと、どんなことでもお気軽にどうぞ。</p>
+    <a class="cta line" id="ask" href="#">LINEで問い合わせる<span>トークに下書きが入ります</span></a>
+  </section>
+
+  <p class="note">メンターがいる時間や行事は「<a href="schedule.html">在室・行事</a>」で確認できます。</p>
+  <footer>みんなのサブスク　石川県かほく市宇野気62-1 江川ビル2階</footer>
+</div>
+<script>
+  var OA = 'https://line.me/R/oaMessage/@subschool/?';
+  document.getElementById('trial').href = OA + encodeURIComponent('【体験希望】\nお名前：\n学年：\nご希望の日時：\n');
+  document.getElementById('ask').href = OA + encodeURIComponent('【お問い合わせ】\n');
+</script>
+</body>
+</html>
