@@ -123,6 +123,12 @@
   .tltrack.droptarget{outline:2px dashed var(--lessonInk);outline-offset:-2px}
   .nomt{color:var(--warn);font-size:13px;font-weight:900;margin-left:8px}
   .tlname.off{color:var(--warn)}
+  .frow{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .frow:last-child{border-bottom:0}
+  .fchk{display:flex;gap:10px;align-items:center;flex:1;min-width:180px;cursor:pointer}
+  .fchk input{width:22px;height:22px;flex:none}
+  .fchk small{display:block;font-size:12px;color:var(--sub)}
+  .fnote{flex:1;min-width:160px;padding:6px 10px;border:1.5px solid var(--line);border-radius:8px;font:inherit;font-size:14px;background:var(--bg)}
   :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 </style>
 </head>
@@ -162,6 +168,18 @@
     <div id="mealList"></div>
   </section>
 
+  <section class="panel" id="p-money">
+    <div class="row"><h2>ビジター利用（当日払い）</h2><b id="vSum" style="color:var(--warn)"></b></div>
+    <p class="muted" style="margin-bottom:8px">ビジターの入退室QRから自動で計算します。入室から2時間30分以内に退室した日は1,200円、それ以上は1,800円です。個別授業だけで来た日など、自習利用料がかからない日は「対象外」にしてください。</p>
+    <div class="seg" id="vFilter" style="margin-bottom:8px"><button type="button" data-v="unpaid" aria-pressed="true">未払いのみ</button><button type="button" data-v="all">すべて</button></div>
+    <div id="vList"><div class="loading">読み込み中…</div></div>
+    <div id="feeBox" hidden>
+      <div class="row" style="margin-top:28px"><h2>月謝の入金</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn" id="fPrev" aria-label="前の月">◀</button><b id="fMonth"></b><button class="btn" id="fNext" aria-label="次の月">▶</button></div></div>
+      <p class="muted" id="fSum" style="margin-bottom:8px"></p>
+      <div id="fList"></div>
+    </div>
+  </section>
+
   <section class="panel" id="p-qr">
     <div class="card">
       <h2>出勤QR</h2>
@@ -181,6 +199,7 @@
   <button data-p="req">依頼<span class="badge" id="reqBadge" hidden></span></button>
   <button data-p="events">行事</button>
   <button data-p="meal">食事</button>
+  <button data-p="money" hidden>支払い</button>
   <button data-p="qr">出勤QR</button>
 </nav>
 
@@ -218,8 +237,9 @@
       document.getElementById('boot').style.display = 'none';
       document.getElementById('tabbar').hidden = false;
       document.getElementById('meName').textContent = r.me.name + 'さん' + (r.me.admin ? '（管理者）' : '');
+      document.querySelector('#tabbar [data-p="money"]').hidden = !r.me.admin;
       if (!document.querySelector('.panel.on')) showPanel('week');
-      renderWeek(); renderEvents(); renderQr(); loadReq(); loadMeal();
+      renderWeek(); renderEvents(); renderQr(); loadReq(); loadMeal(); loadMoney();
     }).catch(function(e){
       if (e.auth || !D) {
         document.getElementById('boot').outerHTML = '<div class="msg"><b>' + esc(e.message) + '</b><p class="muted" style="margin-top:8px">管理者から受け取った専用のURLで開いてください。</p></div>';
@@ -855,7 +875,7 @@
     openModal('<h3>食事' + (isNew ? 'を追加' : 'の設定') + '</h3>'
       + '<div class="two"><label class="f">日付<input type="date" id="mD" value="' + m.date + '"></label><label class="f">受け渡し<input type="time" id="mT" value="' + m.time + '" step="300"></label></div>'
       + '<label class="f">メニュー<input id="mN" value="' + esc(m.menu) + '" maxlength="40" placeholder="例：カレーライス"></label>'
-      + '<div class="two"><label class="f">価格<select id="mP">' + [300, 500].map(function(p){ return '<option value="' + p + '"' + (p === m.price ? ' selected' : '') + '>' + p + '円</option>'; }).join('') + '</select></label>'
+      + '<div class="two"><label class="f">価格<select id="mP">' + [300, 500, 700, 1000].map(function(p){ return '<option value="' + p + '"' + (p === m.price ? ' selected' : '') + '>' + p + '円</option>'; }).join('') + '</select></label>'
       + '<label class="f">限定数<input type="number" id="mL" min="1" max="200" value="' + m.limit + '"></label></div>'
       + '<label class="f">予約の締め切り<input type="datetime-local" id="mDL" value="' + String(m.deadline || '').replace(' ', 'T') + '"></label>'
       + '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="mPub" style="width:auto;display:inline"' + (m.public ? ' checked' : '') + '>生徒・保護者のページに表示して予約を受け付ける</label>'
@@ -900,6 +920,79 @@
       mealAct('sch_meal_cancel', { id: b.dataset.rc }, '取り消しました', m.id, b);
     };
   }
+
+  // ===== 支払い =====
+  var VIS = null, vMode = 'unpaid', FEE = null, feeMonth = null;
+  function loadMoney(){
+    if (!D.me.admin) return;
+    api('sch_money_visit_load').then(function(r){ VIS = r; renderVisit(); })
+      .catch(function(e){ document.getElementById('vList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+    if (D.me.owner) loadFee();
+  }
+  function renderVisit(){
+    document.getElementById('vSum').textContent = '未払い ' + VIS.unpaid + '件';
+    var rows = VIS.rows.filter(function(r){ return vMode === 'all' || r.status === '未'; });
+    document.getElementById('vList').innerHTML = rows.length ? rows.map(function(r){
+      var stay = r.min ? Math.floor(r.min / 60) + '時間' + (r.min % 60) + '分' : '';
+      var k = r.date + '|' + r.sid;
+      return '<div class="card" style="padding:12px 14px"><div class="row"><b>' + label(r.date) + '　' + esc(r.name) + '</b><b>' + r.fee.toLocaleString() + '円</b></div>'
+        + '<div class="muted">' + esc(r.in) + '〜' + esc(r.out) + (stay ? '（' + stay + '）' : '') + (r.paidOn ? '　支払日 ' + esc(r.paidOn) : '') + '</div>'
+        + '<div class="seg" data-k="' + k + '" style="margin-top:8px">' + [['未', '未払い'], ['済', '支払い済み'], ['対象外', '対象外']].map(function(s){ return '<button type="button" data-st="' + s[0] + '" aria-pressed="' + (r.status === s[0]) + '">' + s[1] + '</button>'; }).join('') + '</div>'
+        + '<input class="fnote vnote" data-k="' + k + '" value="' + esc(r.note) + '" placeholder="備考" maxlength="100" style="width:100%;margin-top:6px"></div>';
+    }).join('') : '<div class="card muted">' + (vMode === 'all' ? 'ビジターの利用はまだありません' : '未払いはありません') + '</div>';
+  }
+  document.getElementById('vFilter').onclick = function(ev){
+    var b = ev.target.closest('button'); if (!b) return;
+    vMode = b.dataset.v;
+    [].forEach.call(this.querySelectorAll('button'), function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    if (VIS) renderVisit();
+  };
+  document.getElementById('vList').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-st]'); if (!b) return;
+    var k = b.parentNode.dataset.k.split('|');
+    api('sch_money_visit_set', { date: k[0], sid: k[1], status: b.dataset.st })
+      .then(function(){ toast('更新しました'); return api('sch_money_visit_load'); })
+      .then(function(r){ VIS = r; renderVisit(); }).catch(function(e){ toast(e.message); });
+  });
+  document.getElementById('vList').addEventListener('change', function(ev){
+    var t = ev.target.closest('input.vnote'); if (!t) return;
+    var k = t.dataset.k.split('|');
+    api('sch_money_visit_set', { date: k[0], sid: k[1], note: t.value }).then(function(){
+      toast('備考を保存しました');
+      var r = VIS.rows.filter(function(x){ return x.date === k[0] && x.sid === k[1]; })[0]; if (r) r.note = t.value;
+    }).catch(function(e){ toast(e.message); });
+  });
+  function ymAdd(ym, n){ var p = ym.split('-'); var d = new Date(Date.UTC(+p[0], +p[1] - 1 + n, 1)); return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2); }
+  function loadFee(){
+    document.getElementById('feeBox').hidden = false;
+    if (!feeMonth) feeMonth = D.today.slice(0, 7);
+    var p = feeMonth.split('-');
+    document.getElementById('fMonth').textContent = (+p[0]) + '年' + (+p[1]) + '月分';
+    return api('sch_money_fee_load', { month: feeMonth }).then(function(r){ FEE = r; renderFee(); })
+      .catch(function(e){ document.getElementById('fList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  function renderFee(){
+    var paid = FEE.students.filter(function(s){ return s.paid; }).length;
+    document.getElementById('fSum').textContent = '入金済み ' + paid + ' / ' + FEE.students.length + '人　（チェックを付けると入金日が自動で入ります）';
+    document.getElementById('fList').innerHTML = '<div class="card" style="padding:4px 14px">' + FEE.students.map(function(s){
+      return '<div class="frow"><label class="fchk"><input type="checkbox" data-sid="' + s.id + '"' + (s.paid ? ' checked' : '') + '><span><b>' + esc(s.name) + '</b><small>'
+        + esc([s.grade, s.member].filter(Boolean).join('・')) + (s.paidOn ? '　入金日 ' + esc(s.paidOn) : '') + '</small></span></label>'
+        + '<input class="fnote" data-sid="' + s.id + '" value="' + esc(s.note) + '" placeholder="備考" maxlength="200"></div>';
+    }).join('') + '</div>';
+  }
+  document.getElementById('fPrev').onclick = function(){ feeMonth = ymAdd(feeMonth, -1); loadFee(); };
+  document.getElementById('fNext').onclick = function(){ feeMonth = ymAdd(feeMonth, 1); loadFee(); };
+  document.getElementById('fList').addEventListener('change', function(ev){
+    var c = ev.target.closest('input[type=checkbox][data-sid]');
+    if (c) {
+      api('sch_money_fee_set', { month: feeMonth, sid: c.dataset.sid, paid: c.checked })
+        .then(function(){ toast(c.checked ? '入金済みにしました' : '未入金に戻しました'); return loadFee(); })
+        .catch(function(e){ toast(e.message); c.checked = !c.checked; });
+      return;
+    }
+    var t = ev.target.closest('input.fnote');
+    if (t) api('sch_money_fee_set', { month: feeMonth, sid: t.dataset.sid, note: t.value }).then(function(){ toast('備考を保存しました'); }).catch(function(e){ toast(e.message); });
+  });
 
   // ===== タブ =====
   function showPanel(p){
