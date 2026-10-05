@@ -54,6 +54,7 @@
   .ls{position:absolute;top:3px;bottom:3px;border-radius:5px;font-size:11px;font-weight:700;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:24px;background:#0F6E56;color:#fff;z-index:1}
   .ls.k{background:#534AB7}
   .ml{position:absolute;top:3px;bottom:3px;border-radius:5px;font-size:11px;font-weight:700;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:24px;background:#FAC775;color:#633806;z-index:1}
+  .nomt{color:#B3261E;font-size:13px;font-weight:900;margin-left:8px}
 </style>
 </head>
 <body>
@@ -103,6 +104,7 @@
     document.getElementById('days').innerHTML = '<div class="legend"><span><i style="background:var(--yellow)"></i>メンターがいる時間</span><span><i style="background:#0F6E56"></i>授業</span><span><i style="background:#534AB7"></i>講座</span><span><i style="background:#E8EEF8;box-shadow:inset 0 0 0 1px #28497A"></i>行事</span><span><i style="background:#FAC775"></i>食事</span></div>'
       + r.days.map(function(d){
         var p = d.date.split('-'), cls = d.wd === '日' ? 'sun' : d.wd === '土' ? 'sat' : '';
+        var none = mentors.every(function(m){ return !get(d, m.id).length; });
         var rows = '<div class="row axis"><div class="nm"></div><div class="tr">' + axis + '</div></div>';
         mentors.forEach(function(m){
           rows += '<div class="row"><div class="nm">' + esc(m.name) + '</div><div class="tr" style="--hw:' + hw + '%">'
@@ -112,7 +114,7 @@
         rows += '<div class="row"><div class="nm">行事</div><div class="tr" style="--hw:' + hw + '%">'
           + d.events.map(function(e){ return '<span class="ev" style="' + pos(e.start, e.end) + '" title="' + esc(e.start + '〜' + e.end + ' ' + e.name) + '">' + esc(e.name) + '</span>'; }).join('')
           + (d.meals || []).map(function(x){ var t = x.menu + ' ' + x.price + '円 ' + (x.closed ? (x.remaining <= 0 ? '満席' : '受付終了') : '残り' + x.remaining + '食'); return '<span class="ml" style="' + pos(x.time, hhmm(mins(x.time) + 60)) + '" title="' + esc(x.time + '〜 ' + t) + '">' + esc(t) + '</span>'; }).join('') + '</div></div>';
-        return '<div class="dd"><div class="dt ' + cls + '">' + (+p[1]) + '/' + (+p[2]) + '<small>' + d.wd + '曜</small>' + (d.date === r.today ? '<span class="td">今日</span>' : '') + '</div>' + rows + '</div>';
+        return '<div class="dd"><div class="dt ' + cls + '">' + (+p[1]) + '/' + (+p[2]) + '<small>' + d.wd + '曜</small>' + (d.date === r.today ? '<span class="td">今日</span>' : '') + (none ? '<span class="nomt">メンター不在の日です</span>' : '') + '</div>' + rows + '</div>';
       }).join('');
   }
   function load(){

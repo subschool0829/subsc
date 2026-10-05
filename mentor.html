@@ -121,6 +121,7 @@
   .tlles.dragging,.tlev.dragging{z-index:6;opacity:.9;box-shadow:0 6px 16px rgba(0,0,0,.3);cursor:grabbing}
   .tlev.warnb{box-shadow:0 0 0 2px var(--warn)}
   .tltrack.droptarget{outline:2px dashed var(--lessonInk);outline-offset:-2px}
+  .nomt{color:var(--warn);font-size:13px;font-weight:900;margin-left:8px}
   :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 </style>
 </head>
@@ -277,7 +278,7 @@
       D.lessons.filter(function(l){ return l.date === d; }).forEach(function(l){ items.push({ k:'lesson', start:l.start, o:l }); });
       D.events.filter(function(e){ return e.date === d; }).forEach(function(e){ items.push({ k:'event', start:e.start, o:e }); });
       items.sort(byStart);
-      html += '<div class="day' + (d === D.today ? ' today' : '') + '"><div class="dhead"><b class="' + (w==='日'?'sun':w==='土'?'sat':'') + '">' + label(d) + (d === D.today ? ' <span class="tag" style="background:var(--yellow)">今日</span>' : '') + '</b>'
+      html += '<div class="day' + (d === D.today ? ' today' : '') + '"><div class="dhead"><b class="' + (w==='日'?'sun':w==='土'?'sat':'') + '">' + label(d) + (d === D.today ? ' <span class="tag" style="background:var(--yellow)">今日</span>' : '') + (D.shifts.some(function(s){ return s.date === d; }) ? '' : '<span class="nomt">メンター不在の日です</span>') + '</b>'
         + '<button class="add" data-add="' + d + '" aria-label="' + label(d) + 'に追加">＋</button></div>';
       if (!items.length) html += '<div class="empty">予定なし</div>';
       items.forEach(function(it){
@@ -334,7 +335,7 @@
     var html = '<p class="muted" style="margin-bottom:8px">黄色はメンターの在室時間です。空いているところをタップすると、その時刻・そのメンターで授業を追加できます。授業や行事はドラッグで移動できます（授業は別のメンターや別の日の行へも移せます）。</p>';
     for (var i = 0; i < 7; i++) {
       var d = addDays(weekFrom, i), w = wd(d);
-      html += '<div class="day' + (d === D.today ? ' today' : '') + '"><div class="dhead"><b class="' + (w==='日'?'sun':w==='土'?'sat':'') + '">' + label(d) + (d === D.today ? ' <span class="tag" style="background:var(--yellow)">今日</span>' : '') + '</b>'
+      html += '<div class="day' + (d === D.today ? ' today' : '') + '"><div class="dhead"><b class="' + (w==='日'?'sun':w==='土'?'sat':'') + '">' + label(d) + (d === D.today ? ' <span class="tag" style="background:var(--yellow)">今日</span>' : '') + (D.shifts.some(function(s){ return s.date === d; }) ? '' : '<span class="nomt">メンター不在の日です</span>') + '</b>'
         + '<button class="add" data-add="' + d + '" aria-label="' + label(d) + 'に追加">＋</button></div>'
         + '<div class="tl"><div class="tlin" style="--hw:' + (6000/span) + '%">'
         + '<div class="tlrow tlaxis"><div class="tlname"></div><div class="tltrack">' + axis + '</div></div>';
