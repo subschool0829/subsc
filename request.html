@@ -66,6 +66,9 @@
   .nowm{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .mt{font-size:13px;font-weight:700;border-radius:999px;padding:2px 12px;background:#fff;color:var(--sub)}
   .mt.on{background:#0F6E56;color:#fff}
+  .mrow{display:flex;gap:8px;align-items:center;margin-top:10px}
+  .mrow select{font:inherit;font-size:16px;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;background:#fff}
+  .mbtn{font:inherit;font-weight:900;font-size:15px;background:var(--ink);color:#fff;border:0;border-radius:999px;padding:9px 20px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -84,6 +87,9 @@
 
     <div id="avMain"></div>
     <button class="cta" id="newBtn">授業を申し込む<span>候補の日時を3つまで選べます</span></button>
+
+    <h2>食事の予約</h2>
+    <div id="meals"></div>
 
     <h2>これからの授業</h2>
     <div id="lessons"></div>
@@ -140,6 +146,43 @@
   function toast(t){ var el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function(){ el.classList.remove('on'); }, 2600); }
   function fail(msg){ document.getElementById('boot').hidden = false; document.getElementById('boot').innerHTML = '<b>' + esc(msg) + '</b>'; document.getElementById('main').hidden = true; document.getElementById('form').hidden = true; }
 
+  // ===== 食事の予約 =====
+  var MEALS = null;
+  function loadMeals(){ return api('req_meal_load').then(function(r){ MEALS = r; renderMeals(); }).catch(function(){}); }
+  function renderMeals(){
+    var el = document.getElementById('meals'); if (!el || !MEALS || !D) return;
+    if (!MEALS.meals.length) { el.innerHTML = '<p class="empty">いま予約を受け付けている食事はありません。</p>'; return; }
+    el.innerHTML = MEALS.meals.map(function(m){
+      var mine = m.mine.filter(function(x){ return x.sid === cur; })[0];
+      var h = '<div class="card"><div class="when">' + label(m.date) + ' ' + m.time + '〜</div>'
+        + '<div style="font-weight:900;font-size:17px;margin-top:2px">' + esc(m.menu) + '　' + m.price + '円</div>'
+        + '<div class="sub">' + (m.remaining <= 0 ? '満席です' : '残り' + m.remaining + '食') + (m.deadline ? '　締め切り ' + label(m.deadline.slice(0, 10)) + ' ' + m.deadline.slice(11) : '') + '</div>';
+      if (mine) {
+        h += '<div class="msg">予約済み：' + mine.qty + '食</div>' + (m.past ? '' : '<button class="link" data-mc="' + mine.id + '">予約を取り消す</button>');
+      } else if (!m.closed) {
+        var max = Math.min(MEALS.maxQty, m.remaining), opts = '';
+        for (var i = 1; i <= max; i++) opts += '<option value="' + i + '">' + i + '食</option>';
+        h += '<div class="mrow"><select id="mq_' + m.id + '">' + opts + '</select><button class="mbtn" data-mr="' + m.id + '">予約する</button></div>';
+      } else {
+        h += '<div class="sub" style="margin-top:6px">受付は終了しました</div>';
+      }
+      return h + '</div>';
+    }).join('') + '<p class="note">食事代は月謝と一緒にご請求します。ご家族の分もまとめて予約できます（1回' + MEALS.maxQty + '食まで）。</p>';
+  }
+  document.getElementById('meals').addEventListener('click', function(ev){
+    var b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.mr) {
+      var q = +document.getElementById('mq_' + b.dataset.mr).value;
+      b.disabled = true;
+      api('req_meal_reserve', { mealId: b.dataset.mr, studentId: cur, qty: q }).then(function(){ toast('予約しました'); return loadMeals(); }).catch(function(e){ toast(e.message); b.disabled = false; });
+    }
+    if (b.dataset.mc) {
+      if (!confirm('この食事の予約を取り消しますか？')) return;
+      b.disabled = true;
+      api('req_meal_cancel', { id: b.dataset.mc }).then(function(){ toast('取り消しました'); return loadMeals(); }).catch(function(e){ toast(e.message); b.disabled = false; });
+    }
+  });
+
   function renderNow(n){
     var el = document.getElementById('now'); if (!el || !n) return;
     el.innerHTML = '<div class="nowt">いまの教室<small>' + esc(n.at) + ' 現在</small></div>'
@@ -150,6 +193,7 @@
     return api('req_load').then(function(r){
       D = r;
       renderNow(r.now);
+      loadMeals();
       if (!cur || !D.students.some(function(s){ return s.id === cur; })) cur = D.students[0].id;
       document.getElementById('boot').hidden = true;
       if (document.getElementById('form').hidden) document.getElementById('main').hidden = false;
@@ -176,6 +220,7 @@
     rs.sort(function(a, b){ return (order[a.status] - order[b.status]) || (a.created < b.created ? 1 : -1); });
     document.getElementById('reqs').innerHTML = rs.length ? rs.map(reqCard).join('') : '<p class="empty">申し込み中の授業はありません。</p>';
     renderAv('avMain');
+    renderMeals();
   }
 
   function reqCard(r){

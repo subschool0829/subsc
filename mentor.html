@@ -154,6 +154,12 @@
     <div id="eventList"></div>
   </section>
 
+  <section class="panel" id="p-meal">
+    <div class="row"><h2>食事</h2><button class="btn yel" id="addMealBtn">＋ 追加</button></div>
+    <p class="muted" style="margin-bottom:10px">登録した食事は、生徒・保護者の「個別授業」ページと「在室・行事」ページに表示され、生徒・保護者がそこから予約できます。食事代は予約した食数で、月謝と一緒に集計されます。</p>
+    <div id="mealList"></div>
+  </section>
+
   <section class="panel" id="p-qr">
     <div class="card">
       <h2>出勤QR</h2>
@@ -172,6 +178,7 @@
   <button data-p="week" aria-current="page">週の予定</button>
   <button data-p="req">依頼<span class="badge" id="reqBadge" hidden></span></button>
   <button data-p="events">行事</button>
+  <button data-p="meal">食事</button>
   <button data-p="qr">出勤QR</button>
 </nav>
 
@@ -210,7 +217,7 @@
       document.getElementById('tabbar').hidden = false;
       document.getElementById('meName').textContent = r.me.name + 'さん' + (r.me.admin ? '（管理者）' : '');
       if (!document.querySelector('.panel.on')) showPanel('week');
-      renderWeek(); renderEvents(); renderQr(); loadReq();
+      renderWeek(); renderEvents(); renderQr(); loadReq(); loadMeal();
     }).catch(function(e){
       if (e.auth || !D) {
         document.getElementById('boot').outerHTML = '<div class="msg"><b>' + esc(e.message) + '</b><p class="muted" style="margin-top:8px">管理者から受け取った専用のURLで開いてください。</p></div>';
@@ -819,6 +826,77 @@
     openModal('<h3>却下：' + esc(r.sname) + 'さん</h3><label class="f">理由・ひとこと（任意。生徒に送られます）<textarea id="jMsg" maxlength="200" placeholder="例：その週は授業がいっぱいのため、別の週でお願いします。"></textarea></label>'
       + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn danger" id="jOk" data-label="却下する">却下する</button></div></div>');
     document.getElementById('jOk').onclick = function(){ reqSave('sch_req_reject', { id: r.id, reason: val('jMsg') }, '却下しました', this); };
+  }
+
+  // ===== 食事 =====
+  var MEALS_M = null;
+  function loadMeal(){
+    return api('sch_meal_load').then(function(r){ MEALS_M = r; renderMeal(); })
+      .catch(function(e){ document.getElementById('mealList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  function mealLine(m){ return label(m.date) + ' ' + m.time + '　' + esc(m.menu) + '　' + m.price + '円'; }
+  function renderMeal(){
+    var up = MEALS_M.meals.filter(function(m){ return m.date >= D.today; });
+    var past = MEALS_M.meals.filter(function(m){ return m.date < D.today; }).reverse();
+    var card = function(m){
+      return '<button class="item" style="background:var(--bg);color:var(--ink);padding:12px 14px" data-meal="' + m.id + '"><b>' + mealLine(m) + '</b>' + (m.public ? '' : '<span class="tag" style="background:var(--soft)">非公開</span>')
+        + '<small>予約 ' + m.count + ' / ' + m.limit + '食' + (m.remaining <= 0 ? '（満席）' : '　残り' + m.remaining + '食') + (m.deadline ? '　締切 ' + esc(m.deadline.slice(5).replace('-', '/')) : '') + (m.past ? '　受付終了' : '') + '</small></button>';
+    };
+    document.getElementById('mealList').innerHTML = (up.length ? up.map(card).join('') : '<div class="card muted">予定している食事はありません</div>')
+      + (past.length ? '<h2>これまでの食事</h2>' + past.slice(0, 10).map(card).join('') : '');
+  }
+  document.getElementById('mealList').addEventListener('click', function(ev){ var b = ev.target.closest('button[data-meal]'); if (b) mealDetail(find(MEALS_M.meals, b.dataset.meal)); });
+  document.getElementById('addMealBtn').onclick = function(){ mealForm(null); };
+  function mealForm(m){
+    var isNew = !m;
+    m = m || { date: D.today, time: '18:00', menu: '', price: 300, limit: 20, deadline: D.today + ' 12:00', public: true, memo: '' };
+    openModal('<h3>食事' + (isNew ? 'を追加' : 'の設定') + '</h3>'
+      + '<div class="two"><label class="f">日付<input type="date" id="mD" value="' + m.date + '"></label><label class="f">受け渡し<input type="time" id="mT" value="' + m.time + '" step="300"></label></div>'
+      + '<label class="f">メニュー<input id="mN" value="' + esc(m.menu) + '" maxlength="40" placeholder="例：カレーライス"></label>'
+      + '<div class="two"><label class="f">価格<select id="mP">' + [300, 500].map(function(p){ return '<option value="' + p + '"' + (p === m.price ? ' selected' : '') + '>' + p + '円</option>'; }).join('') + '</select></label>'
+      + '<label class="f">限定数<input type="number" id="mL" min="1" max="200" value="' + m.limit + '"></label></div>'
+      + '<label class="f">予約の締め切り<input type="datetime-local" id="mDL" value="' + String(m.deadline || '').replace(' ', 'T') + '"></label>'
+      + '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="mPub" style="width:auto;display:inline"' + (m.public ? ' checked' : '') + '>生徒・保護者のページに表示して予約を受け付ける</label>'
+      + '<label class="f">メモ（任意）<input id="mM" value="' + esc(m.memo) + '" maxlength="100"></label>'
+      + '<div class="acts">' + (isNew ? '' : '<button class="btn danger" id="mDel">削除</button>')
+      + '<div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="mOk" data-label="保存">保存</button></div></div>');
+    document.getElementById('mOk').onclick = function(){
+      save('sch_meal_save', { id: isNew ? '' : m.id, date: val('mD'), time: val('mT'), menu: val('mN'), price: +val('mP'), limit: +val('mL'), deadline: val('mDL'), public: document.getElementById('mPub').checked, memo: val('mM') }, '食事を保存しました', this);
+    };
+    if (!isNew) document.getElementById('mDel').onclick = function(){ confirmDel('この食事を削除しますか？（予約もすべて消えます）', 'sch_meal_delete', { id: m.id }); };
+  }
+  function mealAct(action, data, msg, mealId, btn){
+    if (btn) btn.disabled = true;
+    return api(action, data).then(function(){ toast(msg); return loadMeal(); })
+      .then(function(){ var m = find(MEALS_M.meals, mealId); if (m) mealDetail(m); else closeModal(); })
+      .catch(function(e){ toast(e.message); if (btn) btn.disabled = false; });
+  }
+  function mealDetail(m){
+    var rs = m.reservations;
+    var total = rs.reduce(function(a, r){ return a + r.qty; }, 0), done = rs.filter(function(r){ return r.done; }).reduce(function(a, r){ return a + r.qty; }, 0);
+    openModal('<h3>' + mealLine(m) + '</h3><p class="muted">予約 ' + total + ' / ' + m.limit + '食　受け渡し済み ' + done + '食' + (m.deadline ? '　締切 ' + esc(m.deadline) : '') + '</p>'
+      + '<div id="mres" style="margin-top:8px">' + (rs.length ? rs.map(function(r){
+          return '<div class="att"><label style="display:flex;align-items:center;gap:8px;font-weight:700"><input type="checkbox" data-done="' + r.id + '"' + (r.done ? ' checked' : '') + '>' + esc(r.sname) + '　×' + r.qty + '</label><button class="btn danger" style="padding:2px 10px" data-rc="' + r.id + '">取消</button></div>';
+        }).join('') : '<p class="muted">まだ予約はありません</p>') + '</div>'
+      + '<div class="two" style="margin-top:12px"><label class="f">予約を追加<select id="mrS"><option value="">生徒を選ぶ</option>' + D.students.map(function(s){ return '<option value="' + s.id + '">' + esc(s.name) + '</option>'; }).join('') + '</select></label>'
+      + '<label class="f">食数<select id="mrQ">' + [1, 2, 3, 4, 5].map(function(n){ return '<option>' + n + '</option>'; }).join('') + '</select></label></div>'
+      + '<p class="muted" style="margin-top:6px">チェックは受け渡し済みの印です。食事代は予約した食数で月謝と一緒に集計されます。</p>'
+      + '<div class="acts"><button class="btn" id="mEdit">食事の設定</button><div class="r"><button class="btn" onclick="closeModal()">閉じる</button><button class="btn pri" id="mrAdd">予約を追加</button></div></div>');
+    document.getElementById('mEdit').onclick = function(){ mealForm(m); };
+    document.getElementById('mrAdd').onclick = function(){
+      if (!val('mrS')) { toast('生徒を選んでください'); return; }
+      mealAct('sch_meal_reserve', { mealId: m.id, studentId: val('mrS'), qty: +val('mrQ') }, '予約を追加しました', m.id, this);
+    };
+    var box = document.getElementById('mres');
+    box.onchange = function(ev){
+      var c = ev.target.closest('input[data-done]'); if (!c) return;
+      api('sch_meal_done', { id: c.dataset.done, done: c.checked }).then(function(){ loadMeal(); }).catch(function(e){ toast(e.message); c.checked = !c.checked; });
+    };
+    box.onclick = function(ev){
+      var b = ev.target.closest('button[data-rc]'); if (!b) return;
+      if (!confirm('この予約を取り消しますか？')) return;
+      mealAct('sch_meal_cancel', { id: b.dataset.rc }, '取り消しました', m.id, b);
+    };
   }
 
   // ===== タブ =====
