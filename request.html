@@ -69,6 +69,7 @@
   .mrow{display:flex;gap:8px;align-items:center;margin-top:10px}
   .mrow select{font:inherit;font-size:16px;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;background:#fff}
   .mbtn{font:inherit;font-weight:900;font-size:15px;background:var(--ink);color:#fff;border:0;border-radius:999px;padding:9px 20px;cursor:pointer}
+  .avname.off{color:#B3261E}
 </style>
 </head>
 <body>
@@ -360,7 +361,7 @@
     for (var t = T0; t <= T1; t += 60) axis += '<span class="avtick" style="left:' + ((t - T0) / span * 100) + '%">' + (t / 60) + '</span>';
     h += '<div class="avrow"><div class="avname"></div><div class="avtrack avaxis">' + axis + '</div></div>';
     D.mentors.forEach(function(m){
-      h += '<div class="avrow"><div class="avname">' + esc(m.name) + '</div><div class="avtrack">';
+      h += '<div class="avrow"><div class="avname' + (((day.byMentor || {})[m.id] || []).length ? '' : ' off') + '">' + esc(m.name) + '</div><div class="avtrack">';
       ((day.byMentor && day.byMentor[m.id]) || []).forEach(function(r){ var a = mins(r[0]), b = mins(r[1]); h += '<span class="avbusy" style="left:' + ((a - T0) / span * 100) + '%;width:' + ((b - a) / span * 100) + '%"></span>'; });
       dayFree(day, m.id).forEach(function(f){
         var ok = f[1] - f[0] >= D.lessonMin;

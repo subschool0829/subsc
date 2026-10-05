@@ -122,6 +122,7 @@
   .tlev.warnb{box-shadow:0 0 0 2px var(--warn)}
   .tltrack.droptarget{outline:2px dashed var(--lessonInk);outline-offset:-2px}
   .nomt{color:var(--warn);font-size:13px;font-weight:900;margin-left:8px}
+  .tlname.off{color:var(--warn)}
   :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
 </style>
 </head>
@@ -348,7 +349,7 @@
       var rows = D.mentors.map(function(m){ return { id: m.id, name: m.name }; });
       if (lessonsDay.some(function(l){ return !l.mentorId; })) rows.push({ id: '', name: '担当未定' });
       rows.forEach(function(m){
-        html += '<div class="tlrow"><div class="tlname">' + esc(m.name) + '</div><div class="tltrack" data-track="1" data-date="' + d + '" data-mentor="' + m.id + '" data-t0="' + T0 + '" data-span="' + span + '">';
+        html += '<div class="tlrow"><div class="tlname' + (m.id && !D.shifts.some(function(s){ return s.date === d && s.mentorId === m.id; }) ? ' off' : '') + '">' + esc(m.name) + '</div><div class="tltrack" data-track="1" data-date="' + d + '" data-mentor="' + m.id + '" data-t0="' + T0 + '" data-span="' + span + '">';
         D.shifts.filter(function(s){ return s.date === d && s.mentorId === m.id; }).forEach(function(s){ html += '<div class="tlshift" style="' + pos(s.start, s.end) + '"></div>'; });
         lessonsDay.filter(function(l){ return (l.mentorId || '') === m.id; }).forEach(function(l){
           var cancel = l.status !== '予定', warn = !cancel && lessonWarnings(l).length;

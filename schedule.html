@@ -55,6 +55,7 @@
   .ls.k{background:#534AB7}
   .ml{position:absolute;top:3px;bottom:3px;border-radius:5px;font-size:11px;font-weight:700;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:24px;background:#FAC775;color:#633806;z-index:1}
   .nomt{color:#B3261E;font-size:13px;font-weight:900;margin-left:8px}
+  .nm.off{color:#B3261E}
 </style>
 </head>
 <body>
@@ -107,7 +108,7 @@
         var none = mentors.every(function(m){ return !get(d, m.id).length; });
         var rows = '<div class="row axis"><div class="nm"></div><div class="tr">' + axis + '</div></div>';
         mentors.forEach(function(m){
-          rows += '<div class="row"><div class="nm">' + esc(m.name) + '</div><div class="tr" style="--hw:' + hw + '%">'
+          rows += '<div class="row"><div class="nm' + (get(d, m.id).length ? '' : ' off') + '">' + esc(m.name) + '</div><div class="tr" style="--hw:' + hw + '%">'
             + get(d, m.id).map(function(x){ return '<span class="bar" style="' + pos(x[0], x[1]) + '" title="' + esc(m.name + ' ' + x[0] + '〜' + x[1]) + '">' + x[0] + '〜' + x[1] + '</span>'; }).join('')
             + (d.lessons || []).filter(function(l){ return l.m === m.id; }).map(function(l){ var k = l.kind === '講座'; return '<span class="ls' + (k ? ' k' : '') + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + (k ? l.title : '授業')) + '">' + (k ? esc(l.title) : '') + '</span>'; }).join('') + '</div></div>';
         });
