@@ -145,7 +145,7 @@
   function addMin(t, n){ var m = mins(t)+n; return Math.floor(m/60) + ':' + ('0'+(m%60)).slice(-2); }
   function slotText(s){ return label(s.date) + ' ' + s.start + '〜' + addMin(s.start, D.lessonMin); }
   function toast(t){ var el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function(){ el.classList.remove('on'); }, 2600); }
-  function fail(msg){ document.getElementById('boot').hidden = false; document.getElementById('boot').innerHTML = '<b>' + esc(msg) + '</b>'; document.getElementById('main').hidden = true; document.getElementById('form').hidden = true; }
+  function fail(msg){ document.getElementById('boot').hidden = false; document.getElementById('boot').innerHTML = '<b>' + esc(msg) + '</b><a class="cta" style="margin-top:18px" href="https://line.me/R/oaMessage/@subschool/?' + encodeURIComponent('授業') + '">専用リンクを受け取る<span>LINEで「授業」と送ります（はじめの1回だけ）</span></a><p class="note" style="margin-top:10px">届いたリンクを一度開くと、次からはメニューの「授業の申し込み」でこのページがそのまま開きます。</p>'; document.getElementById('main').hidden = true; document.getElementById('form').hidden = true; }
 
   // ===== 食事の予約 =====
   var MEALS = null;
@@ -400,7 +400,7 @@
     toast('希望は3つまでです。入れ直すときは日付を消してください');
   });
 
-  if (!TOKEN) fail('公式LINEで「授業」と送ると、このページの専用リンクが届きます。');
+  if (!TOKEN) fail('はじめて開くときは、専用リンクの受け取りが必要です。');
   else load();
   document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible' && D && document.getElementById('form').hidden) load(); });
 </script>
