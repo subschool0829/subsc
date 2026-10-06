@@ -186,6 +186,7 @@
       <p class="muted">教室のタブレットにかざすと、出勤・退勤が記録されます。画面を明るくしてかざしてください。印刷してカードにしてもOKです。</p>
       <div id="qr"></div>
       <p style="text-align:center;font-weight:900" id="qrName"></p>
+      <p style="text-align:center;margin-top:12px"><a class="btn" href="guide.html" target="_blank" rel="noopener" id="guideLink" hidden>保護者向け案内シートを印刷（1人1枚）</a></p>
     </div>
     <div class="card">
       <h2>今日の出勤状況</h2>
@@ -238,6 +239,7 @@
       document.getElementById('tabbar').hidden = false;
       document.getElementById('meName').textContent = r.me.name + 'さん' + (r.me.admin ? '（管理者）' : '');
       document.querySelector('#tabbar [data-p="money"]').hidden = !r.me.admin;
+      document.getElementById('guideLink').hidden = !r.me.admin;
       if (!document.querySelector('.panel.on')) showPanel('week');
       renderWeek(); renderEvents(); renderQr(); loadReq(); loadMeal(); loadMoney();
     }).catch(function(e){

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>登録のご案内（印刷用）｜みんなのサブスク</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{--ink:#1A1A1A;--sub:#5E5E5E;--line:#D9D4C4;--yellow:#F7CE2E;--tint:#FFF5CC;--soft:#F7F6F2}
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;color:var(--ink);background:#e9e7e1;font-weight:500;line-height:1.55}
+  .bar{position:sticky;top:0;z-index:5;background:#fff;border-bottom:4px solid var(--yellow);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .bar b{font-weight:900}
+  .bar select,.bar button{font:inherit;font-weight:700;font-size:14px;border:1.5px solid var(--ink);border-radius:999px;padding:6px 14px;background:#fff;cursor:pointer}
+  .bar button.pri{background:var(--ink);color:#fff}
+  .bar .n{color:var(--sub);font-size:13px}
+  .msg{max-width:600px;margin:40px auto;background:#fff;border-radius:14px;padding:24px;text-align:center}
+  .page{width:210mm;height:297mm;margin:12px auto;background:#fff;padding:12mm 14mm 10mm;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3mm solid var(--yellow);padding-bottom:2mm}
+  .brand{font-size:11pt;font-weight:900}
+  .title{font-size:19pt;font-weight:900;line-height:1.2}
+  .who{display:flex;justify-content:space-between;align-items:center;margin-top:5mm;gap:6mm}
+  .who .nm{font-size:20pt;font-weight:900}
+  .who .nm small{font-size:11pt;font-weight:700;margin-left:2mm}
+  .code{border:0.6mm solid var(--ink);border-radius:3mm;padding:2mm 5mm;text-align:center}
+  .code small{display:block;font-size:8.5pt;font-weight:700;color:var(--sub)}
+  .code b{font-size:20pt;font-weight:900;letter-spacing:.12em;font-family:"Menlo","Consolas",monospace}
+  .done{margin-top:4mm;background:var(--tint);border-radius:3mm;padding:2.5mm 4mm;font-size:10pt;font-weight:700}
+  .steps{margin-top:4mm;display:grid;gap:2.4mm}
+  .step{display:flex;gap:3mm;font-size:10.5pt}
+  .step .no{flex:none;width:7mm;height:7mm;border-radius:50%;background:var(--ink);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:10pt}
+  .step b{font-weight:900}
+  .step .sub{display:block;font-size:9pt;color:var(--sub)}
+  .ex{display:inline-block;background:var(--soft);border-radius:1.5mm;padding:0 2mm;font-weight:900;font-family:"Menlo","Consolas",monospace;letter-spacing:.06em}
+  .qrs{margin-top:4mm;display:grid;grid-template-columns:1fr 1fr;gap:5mm}
+  .qbox{border:0.4mm solid var(--line);border-radius:3mm;padding:3mm;display:flex;gap:3mm;align-items:center}
+  .qbox .q{flex:none;width:30mm;height:30mm}
+  .qbox .q img,.qbox .q canvas{width:30mm!important;height:30mm!important}
+  .qbox b{font-size:11pt;font-weight:900;display:block}
+  .qbox span{font-size:8.5pt;color:var(--sub);display:block;word-break:break-all}
+  .cut{margin-top:auto;border-top:0.4mm dashed var(--sub);padding-top:4mm;position:relative}
+  .cut::before{content:"✂ きりとり";position:absolute;top:-3.2mm;left:4mm;background:#fff;padding:0 2mm;font-size:8pt;color:var(--sub)}
+  .card{display:flex;gap:5mm;align-items:center;border:0.6mm solid var(--ink);border-radius:4mm;padding:4mm 5mm;width:150mm;margin:0 auto}
+  .card .q{flex:none;width:40mm;height:40mm}
+  .card .q img,.card .q canvas{width:40mm!important;height:40mm!important}
+  .card .t small{display:block;font-size:9pt;font-weight:700;color:var(--sub)}
+  .card .t b{display:block;font-size:17pt;font-weight:900;margin:1mm 0}
+  .card .t span{font-size:9.5pt}
+  .foot{margin-top:3mm;text-align:center;font-size:8pt;color:var(--sub)}
+  @media print{
+    @page{size:A4;margin:0}
+    body{background:#fff}
+    .bar,.msg{display:none!important}
+    .page{margin:0;box-shadow:none;page-break-after:always;break-after:page}
+  }
+</style>
+</head>
+<body>
+<div class="bar" id="bar" hidden>
+  <b>登録のご案内（1人1枚）</b>
+  <select id="filter"><option value="unlinked">LINE未登録の生徒だけ</option><option value="all">全員</option></select>
+  <button class="pri" id="printBtn">印刷する</button>
+  <span class="n" id="count"></span>
+</div>
+<div class="msg" id="boot">読み込み中…</div>
+<div id="pages"></div>
+
+<script>
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbwoPiOpPmUcykIrgUGYj5f0z1jnPA6gH3cU2aUDsqSLVKlAB9CytbtpYb8iqHAS81kQ-g/exec';
+  var LINE_URL = 'https://lin.ee/UcXLGVg';
+  var FORM_URL = 'https://forms.gle/5XpmWff4jCFtaGeZ6';
+  var KEY = '';
+  try { KEY = localStorage.getItem('subsc_mkey') || ''; } catch(e){}
+  var S = [];
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function qr(el, text){ new QRCode(el, { text: text, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M }); }
+  function page(s){
+    return '<section class="page">'
+      + '<div class="head"><div><div class="brand">みんなのサブスク</div><div class="title">公式LINE・在籍登録のご案内</div></div><div class="brand">保存版</div></div>'
+      + '<div class="who"><div class="nm">' + esc(s.name) + '<small>さん・保護者の方へ</small></div>'
+      + '<div class="code"><small>登録コード</small><b>' + esc(s.code) + '</b></div></div>'
+      + '<div class="done">すでに公式LINEで登録がお済みの方は、手続きは不要です（下の入退室カードだけお使いください）。</div>'
+      + '<div class="steps">'
+      + '<div class="step"><span class="no">1</span><div><b>保護者の方が、公式LINEを友だち追加</b><span class="sub">左下のQRコード「公式LINE」を読み取ってください。</span></div></div>'
+      + '<div class="step"><span class="no">2</span><div><b>在籍登録フォームを入力（5分ほど）</b><span class="sub">右下のQRコード、または公式LINEのメニュー「入会・体験・お問い合わせ」から。ビジター（非会員）の方もこちらから。</span></div></div>'
+      + '<div class="step"><span class="no">3</span><div><b>公式LINEのトークに、登録コード <span class="ex">' + esc(s.code) + '</span> を送る</b><span class="sub">入退室のお知らせ、個別授業の申し込み、食事の予約が、公式LINEからできるようになります。ご両親など複数の方は、それぞれのLINEで送ってください。</span></div></div>'
+      + '<div class="step"><span class="no">4</span><div><b>スマホを持っている生徒は、本人も登録</b><span class="sub">生徒のスマホで公式LINEを友だち追加し、<span class="ex">' + esc(s.code) + ' 生徒</span> と送ってください。自分の授業の予定やメンターがいる時間を確認できます（入退室のお知らせは保護者の方だけに届きます）。</span></div></div>'
+      + '</div>'
+      + '<div class="qrs">'
+      + '<div class="qbox"><div class="q" data-qr="' + LINE_URL + '"></div><div><b>公式LINE</b><span>友だち追加</span><span>' + LINE_URL + '</span></div></div>'
+      + '<div class="qbox"><div class="q" data-qr="' + FORM_URL + '"></div><div><b>在籍登録フォーム</b><span>保護者の方が入力</span><span>' + FORM_URL + '</span></div></div>'
+      + '</div>'
+      + '<div class="cut"><div class="card"><div class="q" data-qr="SUBSC:' + esc(s.id) + '"></div><div class="t"><small>みんなのサブスク　入退室カード</small><b>' + esc(s.name) + '</b><span>教室のタブレットにかざしてください。<br>入るときも、帰るときも同じカードでOK。</span></div></div>'
+      + '<div class="foot">みんなのサブスク　石川県かほく市宇野気62-1 江川ビル2階</div></div>'
+      + '</section>';
+  }
+  function render(){
+    var mode = document.getElementById('filter').value;
+    var list = S.filter(function(s){ return mode === 'all' || !s.linked; });
+    document.getElementById('count').textContent = list.length + '人分（' + list.length + '枚）';
+    var box = document.getElementById('pages');
+    box.innerHTML = list.map(page).join('');
+    [].forEach.call(box.querySelectorAll('[data-qr]'), function(el){ qr(el, el.getAttribute('data-qr')); });
+  }
+  document.getElementById('filter').onchange = render;
+  document.getElementById('printBtn').onclick = function(){ window.print(); };
+  if (!KEY) {
+    document.getElementById('boot').innerHTML = '<b>このページは開けません</b><p style="margin-top:8px;color:#5E5E5E">メンター用ページを一度開いたパソコン（管理者）で開いてください。</p>';
+  } else {
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'sch_guide_data', mkey: KEY }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        if (!r.ok) throw new Error(r.message || 'エラーが起きました');
+        S = r.students;
+        document.getElementById('boot').hidden = true;
+        document.getElementById('bar').hidden = false;
+        render();
+      })
+      .catch(function(e){ document.getElementById('boot').innerHTML = '<b>' + esc(e.message) + '</b>'; });
+  }
+</script>
+</body>
+</html>
