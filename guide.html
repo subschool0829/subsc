@@ -52,12 +52,13 @@
   .card .t span{font-size:9.5pt}
   .foot{margin-top:3mm;text-align:center;font-size:8pt;color:var(--sub)}
   @media print{
-    @page{size:A4;margin:0}
+    @page{size:A4;margin:10mm}
     body{background:#fff}
     .bar,.msg{display:none!important}
     html,body{margin:0;padding:0}
-    .page{margin:0;box-shadow:none;height:296mm;page-break-after:always;break-after:page}
+    .page{width:auto;height:auto;margin:0;padding:0;box-shadow:none;overflow:visible;display:block;page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid}
     .page:last-child{page-break-after:auto;break-after:auto}
+    .cut{margin-top:14mm}
   }
 </style>
 </head>
