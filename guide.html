@@ -55,7 +55,9 @@
     @page{size:A4;margin:0}
     body{background:#fff}
     .bar,.msg{display:none!important}
-    .page{margin:0;box-shadow:none;page-break-after:always;break-after:page}
+    html,body{margin:0;padding:0}
+    .page{margin:0;box-shadow:none;height:296mm;page-break-after:always;break-after:page}
+    .page:last-child{page-break-after:auto;break-after:auto}
   }
 </style>
 </head>
