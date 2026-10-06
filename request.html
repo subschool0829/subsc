@@ -208,6 +208,7 @@
     who.innerHTML = D.students.map(function(s){ return '<button data-sid="' + s.id + '" aria-pressed="' + (s.id === cur) + '">' + esc(s.name) + 'さん</button>'; }).join('');
     var st = D.students.filter(function(s){ return s.id === cur; })[0];
     document.getElementById('lead').textContent = st.name + 'さんの、申し込みと予定の確認ができます。';
+    if (D.openFrom && D.today < D.openFrom) { var nb = document.getElementById('newBtn'); nb.innerHTML = '授業の申し込み<span>' + label(D.openFrom) + 'から受け付けます（' + label(D.lessonFrom) + '以降の授業）</span>'; nb.style.opacity = '.55'; }
 
     var ls = D.lessons.filter(function(l){ return l.students.indexOf(cur) >= 0; });
     document.getElementById('lessons').innerHTML = ls.length ? ls.map(function(l){
@@ -264,6 +265,7 @@
   var TIMES = [];
   for (var m = 10*60; m <= 21*60; m += 30) TIMES.push(('0'+Math.floor(m/60)).slice(-2) + ':' + ('0'+(m%60)).slice(-2));
   function openForm(){
+    if (D.openFrom && D.today < D.openFrom) { toast('授業の申し込みは' + label(D.openFrom) + 'から受け付けます'); return; }
     var st = D.students.filter(function(s){ return s.id === cur; })[0];
     document.getElementById('formWho').innerHTML = '<p><b>' + esc(st.name) + 'さん</b>の授業を申し込みます。</p>'
       + '<label class="f">希望のメンター <small>（任意）</small><select id="fMentor"><option value="">指定なし</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '">' + esc(m.name) + 'さん</option>'; }).join('') + '</select></label>';
@@ -271,7 +273,7 @@
     var h = '';
     for (var i = 0; i < 3; i++) {
       h += '<div class="cand"><b>第' + (i+1) + '希望' + (i ? '<small style="font-weight:500;color:var(--sub)">（任意）</small>' : '') + '</b>'
-        + '<div class="row2"><label class="f" style="margin-top:6px">日付<input type="date" id="d' + i + '" min="' + D.today + '"></label>'
+        + '<div class="row2"><label class="f" style="margin-top:6px">日付<input type="date" id="d' + i + '" min="' + (D.lessonFrom && D.lessonFrom > D.today ? D.lessonFrom : D.today) + '"></label>'
         + '<label class="f" style="margin-top:6px">開始<select id="t' + i + '"><option value="">選ぶ</option>' + TIMES.map(function(t){ return '<option>' + t + '</option>'; }).join('') + '</select></label></div>'
         + '<div class="hint" id="h' + i + '"></div></div>';
     }
