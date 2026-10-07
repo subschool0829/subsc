@@ -282,11 +282,34 @@
   // ===== 申し込みフォーム =====
   var TIMES = [];
   for (var m = 10*60; m <= 21*60; m += 30) TIMES.push(('0'+Math.floor(m/60)).slice(-2) + ':' + ('0'+(m%60)).slice(-2));
+  function tmin(x){ return +x.slice(0, 2) * 60 + +x.slice(3, 5); }
+  function fixedFor(mid){
+    var m = D.mentors.filter(function(x){ return x.id === mid; })[0];
+    return m && D.fixedStart ? D.fixedStart[String(m.name).trim().toLowerCase()] || null : null;
+  }
+  function timeOpts(mid){
+    var f = fixedFor(mid);
+    if (!f) return TIMES.map(function(t){ return '<option>' + t + '</option>'; }).join('');
+    return f.core.concat(f.extra).sort().map(function(t){ return '<option value="' + t + '">' + t + (f.extra.indexOf(t) >= 0 ? '（要相談）' : '') + '</option>'; }).join('');
+  }
+  function applyTimes(){
+    var mid = document.getElementById('fMentor').value, f = fixedFor(mid);
+    for (var k = 0; k < 3; k++) {
+      var sel = document.getElementById('t' + k), v = sel.value;
+      sel.innerHTML = '<option value="">選ぶ</option>' + timeOpts(mid);
+      if (v && ![].some.call(sel.options, function(o){ return o.value === v; })) {
+        if (f) v = ''; else { var o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); }
+      }
+      sel.value = v;
+    }
+    var n = document.getElementById('fixNote');
+    if (n) n.textContent = f ? 'このメンターの授業は、開始時刻が決まっています（' + f.core.join('・') + '）。' + (f.extra.length ? f.extra.join('・') + 'はコアタイム外のため要相談です。' : '') : '';
+  }
   function openForm(){
     if (D.openFrom && D.today < D.openFrom) { toast('授業の申し込みは' + label(D.openFrom) + 'から受け付けます'); return; }
     var st = D.students.filter(function(s){ return s.id === cur; })[0];
     document.getElementById('formWho').innerHTML = '<p><b>' + esc(st.name) + 'さん</b>の授業を申し込みます。</p>'
-      + '<label class="f">希望のメンター <small>（任意）</small><select id="fMentor"><option value="">指定なし</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '">' + esc(m.name) + 'さん</option>'; }).join('') + '</select></label>';
+      + '<label class="f">希望のメンター <small>（任意）</small><select id="fMentor"><option value="">指定なし</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '">' + esc(m.name) + 'さん</option>'; }).join('') + '</select></label><p class="hint" id="fixNote"></p>';
     var max = D.days[D.days.length - 1].date;
     var h = '';
     for (var i = 0; i < 3; i++) {
@@ -299,7 +322,8 @@
     for (var j = 0; j < 3; j++) (function(k){
       ['d','t'].forEach(function(p){ document.getElementById(p + k).addEventListener('change', function(){ hint(k); }); });
     })(j);
-    document.getElementById('fMentor').addEventListener('change', function(){ for (var k = 0; k < 3; k++) hint(k); });
+    document.getElementById('fMentor').addEventListener('change', function(){ applyTimes(); for (var k = 0; k < 3; k++) hint(k); });
+    applyTimes();
     renderAv('av');
     ['fContent','fWith','fMemo'].forEach(function(id){ document.getElementById(id).value = ''; });
     document.getElementById('fErr').textContent = '';
@@ -403,6 +427,13 @@
     var m = Math.floor((s + (ev.clientX - r.left) / r.width * (e - s)) / 30) * 30;
     if (m + D.lessonMin > e) m = e - D.lessonMin;
     if (m < s) m = s;
+    var fx = fixedFor(b.dataset.m);
+    if (fx) {
+      var pick = function(list){ var best = null; list.forEach(function(x){ var v = tmin(x); if (v >= s && v + D.lessonMin <= e && (best === null || Math.abs(v - m) < Math.abs(best - m))) best = v; }); return best; };
+      var p = pick(fx.core); if (p === null) p = pick(fx.extra);
+      if (p === null) { toast('この空き時間には、授業の開始時刻（' + fx.core.join('・') + '）が入りません'); return; }
+      m = p;
+    }
     var t = hmz(m);
     if (box === 'avMain') openForm();
     for (var k = 0; k < 3; k++) {
@@ -412,6 +443,7 @@
         if (![].some.call(sel.options, function(o){ return o.value === t; })) { var o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o); }
         sel.value = t;
         document.getElementById('fMentor').value = b.dataset.m;
+        applyTimes();
         for (var j = 0; j < 3; j++) hint(j);
         toast('第' + (k + 1) + '希望に ' + label(avDate) + ' ' + t + '〜 を入れました');
         return;
