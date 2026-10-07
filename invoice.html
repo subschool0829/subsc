@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ご請求｜みんなのサブスク</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#1A1A1A;--sub:#5E5E5E;--line:#E4E0D3;--yellow:#F7CE2E;--tint:#FFF5CC;--soft:#F7F6F2;--ok:#0F6E56;--warn:#B3261E}
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;color:var(--ink);background:#fff;font-weight:500;line-height:1.6}
+  .wrap{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+  .brand{font-size:13px;font-weight:900;color:var(--sub)}
+  h1{font-size:26px;font-weight:900;line-height:1.3;margin-top:4px;padding-bottom:10px;border-bottom:4px solid var(--yellow)}
+  .to{margin-top:16px;font-size:18px;font-weight:900}
+  .meta{font-size:13px;color:var(--sub)}
+  .total{margin-top:14px;background:var(--tint);border-radius:14px;padding:16px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px}
+  .total b{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums}
+  .badge{display:inline-block;border-radius:999px;padding:3px 12px;font-size:13px;font-weight:900}
+  .badge.paid{background:var(--ok);color:#fff}
+  .badge.due{background:#fff;border:2px solid var(--warn);color:var(--warn)}
+  table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
+  td{padding:9px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+  td.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:700}
+  td small{display:block;color:var(--sub);font-size:11.5px;line-height:1.5}
+  tr.sum td{border-bottom:0;font-weight:900;font-size:16px}
+  h2{font-size:17px;font-weight:900;margin-top:26px}
+  .box{margin-top:8px;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px}
+  .box b{font-weight:900}
+  .note{font-size:12.5px;color:var(--sub);margin-top:8px}
+  .btn{display:inline-block;margin-top:14px;font:inherit;font-weight:900;font-size:15px;background:var(--ink);color:#fff;border:0;border-radius:999px;padding:11px 22px;cursor:pointer;text-decoration:none}
+  .btn.line{background:#fff;color:var(--ink);border:1.5px solid var(--ink)}
+  .msg{margin-top:40px;text-align:center}
+  /* 領収書 */
+  .rc{border:2px solid var(--ink);border-radius:6px;padding:28px 26px;margin-top:20px}
+  .rc h3{text-align:center;font-size:26px;font-weight:900;letter-spacing:.4em;margin-bottom:18px}
+  .rc .row{display:flex;justify-content:space-between;font-size:13px;color:var(--sub)}
+  .rc .nm{margin-top:14px;font-size:19px;font-weight:900;border-bottom:1px solid var(--ink);padding-bottom:4px}
+  .rc .amt{margin:18px auto 6px;text-align:center;font-size:30px;font-weight:900;background:var(--soft);padding:8px;border-radius:4px;font-variant-numeric:tabular-nums}
+  .rc .tx{font-size:14px;margin-top:10px}
+  .rc .iss{margin-top:22px;text-align:right;font-size:13px;line-height:1.7}
+  .rc .iss b{font-size:15px}
+  @media print{
+    @page{size:A4;margin:16mm}
+    .noprint{display:none!important}
+    .wrap{max-width:none;padding:0}
+    #inv.printing-receipt{display:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="msg" id="boot">読み込み中…</div>
+
+  <div id="inv" hidden>
+    <div class="brand">みんなのサブスク</div>
+    <h1 id="title"></h1>
+    <div class="to" id="to"></div>
+    <div class="meta" id="meta"></div>
+    <div class="total"><span>ご請求金額（税込）</span><b id="total"></b><span id="badge"></span></div>
+    <table id="items"></table>
+
+    <div id="payBox">
+      <h2>お支払い</h2>
+      <div class="box" id="due"></div>
+      <h2>お振込先</h2>
+      <div class="box" id="bank"></div>
+      <p class="note">振込名義は「会員番号＋お名前」でお願いします（例：S013 タケザワ）。現金の場合は、教室でメンターにお渡しください。お支払いの確認ができると、このページに「お支払い済み」と表示されます。</p>
+    </div>
+
+    <div id="paidBox" hidden>
+      <h2>お支払い済み</h2>
+      <div class="box" id="paidText"></div>
+      <button class="btn noprint" id="rcBtn">領収書を表示・印刷する</button>
+    </div>
+  </div>
+
+  <div id="rcWrap" hidden>
+    <div class="noprint" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="printBtn">印刷・PDFで保存</button>
+      <button class="btn line" id="backBtn">請求に戻る</button>
+    </div>
+    <div class="rc" id="rc"></div>
+    <p class="note noprint">「印刷・PDFで保存」から、プリンターで印刷するか、PDFとして保存できます。電子で発行する領収書のため、収入印紙は不要です。</p>
+  </div>
+</div>
+
+<script>
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbwoPiOpPmUcykIrgUGYj5f0z1jnPA6gH3cU2aUDsqSLVKlAB9CytbtpYb8iqHAS81kQ-g/exec';
+  var R = null;
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function yen(n){ return (n < 0 ? '−' : '') + Math.abs(n).toLocaleString('ja-JP') + '円'; }
+  function jd(d){ var p = String(d || '').split('-'); return p.length === 3 ? (+p[0]) + '年' + (+p[1]) + '月' + (+p[2]) + '日' : ''; }
+  var t = (location.hash.match(/t=([A-Za-z0-9]+)/) || [])[1] || '';
+  function render(){
+    var b = R.bill, bk = R.bank, paid = b.status === '入金済み';
+    document.title = b.monthLabel + 'のご請求｜みんなのサブスク';
+    document.getElementById('title').textContent = b.monthLabel + 'のご請求';
+    document.getElementById('to').textContent = b.to;
+    document.getElementById('meta').textContent = '請求番号 ' + b.id;
+    document.getElementById('total').textContent = yen(b.total);
+    document.getElementById('badge').innerHTML = paid ? '<span class="badge paid">お支払い済み</span>' : '<span class="badge due">お支払い待ち</span>';
+    document.getElementById('items').innerHTML = b.items.map(function(i){
+      return '<tr><td>' + esc(i.label) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</td><td class="r">' + yen(i.amount) + '</td></tr>';
+    }).join('') + '<tr class="sum"><td>合計</td><td class="r">' + yen(b.total) + '</td></tr>';
+    document.getElementById('due').innerHTML = '<b>' + esc(R.due) + '</b>に、現金または振込でお支払いください。';
+    document.getElementById('bank').innerHTML = esc(bk.bank) + '（金融機関コード ' + esc(bk.bankCode) + '）<br>' + esc(bk.branch) + '（店番 ' + esc(bk.branchCode) + '）<br>' + esc(bk.type) + '　<b>' + esc(bk.number) + '</b><br>口座名義　<b>' + esc(bk.holder) + '</b>';
+    document.getElementById('payBox').hidden = paid;
+    document.getElementById('paidBox').hidden = !paid;
+    if (paid) document.getElementById('paidText').textContent = jd(b.paidOn) + '　' + b.method + 'でのお支払いを確認しました。ありがとうございました。';
+    document.getElementById('inv').hidden = false;
+  }
+  function receipt(){
+    var b = R.bill;
+    document.getElementById('rc').innerHTML = '<h3>領収書</h3>'
+      + '<div class="row"><span>No. ' + esc(R.receiptNo) + '</span><span>' + jd(b.paidOn) + '</span></div>'
+      + '<div class="nm">' + esc(b.to) + '</div>'
+      + '<div class="amt">' + yen(b.total) + '（税込）</div>'
+      + '<div class="tx">但し　' + esc(b.monthLabel) + 'ご利用料として（' + esc(b.method) + '）<br>上記の金額を正に領収いたしました。</div>'
+      + '<div class="iss"><b>みんなのサブスク</b><br>代表　今本 誠和<br>〒929-1125 石川県かほく市宇野気ト62-1 江川ビル2階<br>電話 090-1638-5444</div>';
+    document.getElementById('inv').hidden = true;
+    document.getElementById('rcWrap').hidden = false;
+    window.scrollTo(0, 0);
+  }
+  document.getElementById('rcBtn').onclick = receipt;
+  document.getElementById('printBtn').onclick = function(){ window.print(); };
+  document.getElementById('backBtn').onclick = function(){ document.getElementById('rcWrap').hidden = true; document.getElementById('inv').hidden = false; };
+  if (!t) {
+    document.getElementById('boot').innerHTML = '<b>このページは開けません</b><p class="note">公式LINEやメールで届いたリンクから開いてください。</p>';
+  } else {
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'bill_view', t: t }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){ if (!r.ok) throw new Error(r.message); R = r; document.getElementById('boot').hidden = true; render(); })
+      .catch(function(e){ document.getElementById('boot').innerHTML = '<b>' + esc(e.message || 'エラーが起きました') + '</b>'; });
+  }
+</script>
+</body>
+</html>

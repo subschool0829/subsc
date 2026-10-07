@@ -89,6 +89,9 @@
     <div id="avMain"></div>
     <button class="cta" id="newBtn">授業を申し込む<span>候補の日時を3つまで選べます</span></button>
 
+    <h2 id="billsH" hidden>ご請求・お支払い</h2>
+    <div id="bills"></div>
+
     <h2>食事の予約</h2>
     <div id="meals"></div>
 
@@ -147,6 +150,20 @@
   function toast(t){ var el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function(){ el.classList.remove('on'); }, 2600); }
   function fail(msg){ document.getElementById('boot').hidden = false; document.getElementById('boot').innerHTML = '<b>' + esc(msg) + '</b><a class="cta" style="margin-top:18px" href="https://line.me/R/oaMessage/@subschool/?' + encodeURIComponent('授業') + '">専用リンクを受け取る<span>LINEで「授業」と送ります（はじめの1回だけ）</span></a><p class="note" style="margin-top:10px">届いたリンクを一度開くと、次からはメニューの「授業の申し込み」でこのページがそのまま開きます。</p>'; document.getElementById('main').hidden = true; document.getElementById('form').hidden = true; }
 
+  // ===== ご請求 =====
+  function loadBills(){ return api('req_bill_list').then(function(r){ renderBills(r.bills || []); }).catch(function(){}); }
+  function renderBills(list){
+    var el = document.getElementById('bills'); if (!el) return;
+    document.getElementById('billsH').hidden = !list.length;
+    el.innerHTML = list.map(function(b){
+      var paid = b.status === '入金済み';
+      return '<a class="card" style="display:block;text-decoration:none;color:inherit" href="invoice.html#t=' + b.token + '"><div class="when">' + esc(b.monthLabel) + '</div>'
+        + '<div style="font-weight:900;font-size:17px;margin-top:2px">' + Number(b.total).toLocaleString() + '円　'
+        + (paid ? '<span style="color:#0F6E56">お支払い済み</span>' : '<span style="color:#B3261E">お支払い待ち</span>') + '</div>'
+        + '<div class="sub">' + (paid ? '領収書はこちらから表示・印刷できます' : '明細・お振込先を見る') + ' ›</div></a>';
+    }).join('');
+  }
+
   // ===== 食事の予約 =====
   var MEALS = null;
   function loadMeals(){ return api('req_meal_load').then(function(r){ MEALS = r; renderMeals(); }).catch(function(){}); }
@@ -195,6 +212,7 @@
       D = r;
       renderNow(r.now);
       loadMeals();
+      loadBills();
       if (!cur || !D.students.some(function(s){ return s.id === cur; })) cur = D.students[0].id;
       document.getElementById('boot').hidden = true;
       if (document.getElementById('form').hidden) document.getElementById('main').hidden = false;

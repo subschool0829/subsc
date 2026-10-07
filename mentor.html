@@ -180,6 +180,14 @@
     </div>
   </section>
 
+  <section class="panel" id="p-bill">
+    <div class="row"><h2>請求</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn" id="bPrev" aria-label="前の月">◀</button><b id="bMonth"></b><button class="btn" id="bNext" aria-label="次の月">▶</button></div></div>
+    <p class="muted" id="bSum" style="margin:6px 0 10px"></p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="bBuild">下書きを作成</button><button class="btn" id="bConfirm">下書きをすべて確定</button><button class="btn yel" id="bSend">確定分をLINE・メールで送付</button></div>
+    <p class="muted" style="margin-bottom:10px;font-size:12px">下書きは、名簿の月額・割引・家族IDと、授業・講座・食事の記録から作ります。家族を押すと、項目と金額を直したり、模試・テキスト代などを追加したりできます。入金の記録もここから付けます。</p>
+    <div id="bList"><div class="loading">読み込み中…</div></div>
+  </section>
+
   <section class="panel" id="p-qr">
     <div class="card">
       <h2>出勤QR</h2>
@@ -201,6 +209,7 @@
   <button data-p="events">行事</button>
   <button data-p="meal">食事</button>
   <button data-p="money" hidden>支払い</button>
+  <button data-p="bill" hidden>請求</button>
   <button data-p="qr">出勤QR</button>
 </nav>
 
@@ -239,6 +248,7 @@
       document.getElementById('tabbar').hidden = false;
       document.getElementById('meName').textContent = r.me.name + 'さん' + (r.me.admin ? '（管理者）' : '');
       document.querySelector('#tabbar [data-p="money"]').hidden = !r.me.admin;
+      document.querySelector('#tabbar [data-p="bill"]').hidden = !r.me.owner;
       document.getElementById('guideLink').hidden = !r.me.admin;
       if (!document.querySelector('.panel.on')) showPanel('week');
       renderWeek(); renderEvents(); renderQr(); loadReq(); loadMeal(); loadMoney();
@@ -929,7 +939,7 @@
     if (!D.me.admin) return;
     api('sch_money_visit_load').then(function(r){ VIS = r; renderVisit(); })
       .catch(function(e){ document.getElementById('vList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
-    if (D.me.owner) loadFee();
+    if (D.me.owner) loadBill();
   }
   function renderVisit(){
     document.getElementById('vSum').textContent = '未払い ' + VIS.unpaid + '件';
@@ -995,6 +1005,111 @@
     var t = ev.target.closest('input.fnote');
     if (t) api('sch_money_fee_set', { month: feeMonth, sid: t.dataset.sid, note: t.value }).then(function(){ toast('備考を保存しました'); }).catch(function(e){ toast(e.message); });
   });
+
+  // ===== 請求（オーナーのみ） =====
+  var BILL = null, billMonth = null;
+  function ymNext(ym, n){ var p = ym.split('-'); var d = new Date(Date.UTC(+p[0], +p[1] - 1 + n, 1)); return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2); }
+  function yen(n){ return (n < 0 ? '−' : '') + Math.abs(n).toLocaleString() + '円'; }
+  function loadBill(){
+    if (!billMonth) billMonth = ymNext(D.today.slice(0, 7), D.today.slice(8) > '15' ? 1 : 0);
+    var p = billMonth.split('-');
+    document.getElementById('bMonth').textContent = (+p[0]) + '年' + (+p[1]) + '月分';
+    return api('sch_bill_load', { month: billMonth }).then(function(r){ BILL = r; renderBill(); })
+      .catch(function(e){ document.getElementById('bList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  function renderBill(){
+    var L = BILL.list;
+    var cnt = function(f){ return L.filter(f).length; };
+    var sum = function(f){ return L.filter(f).reduce(function(a, b){ return a + b.total; }, 0); };
+    document.getElementById('bSum').innerHTML = '授業・食事の対象期間：' + esc(BILL.period) + '<br>'
+      + '下書き ' + cnt(function(b){ return b.status === '下書き'; }) + '件　確定 ' + cnt(function(b){ return b.status === '確定'; }) + '件（未送付 ' + cnt(function(b){ return b.status !== '下書き' && !b.sent; }) + '）　入金済み ' + cnt(function(b){ return b.status === '入金済み'; }) + '件<br>'
+      + '請求合計 ' + yen(sum(function(){ return true; })) + '　入金済み ' + yen(sum(function(b){ return b.status === '入金済み'; })) + '　未入金 ' + yen(sum(function(b){ return b.status !== '入金済み'; }));
+    var st = function(b){
+      if (b.status === '入金済み') return '<span class="tag" style="background:#0F6E56;color:#fff">入金済み ' + esc(b.method) + '</span>';
+      if (b.status === '確定') return '<span class="tag" style="background:var(--yellow)">確定' + (b.sent ? '・' + esc(b.sent) + '送付済み' : '・未送付') + '</span>';
+      return '<span class="tag" style="background:var(--soft)">下書き</span>';
+    };
+    document.getElementById('bList').innerHTML = L.length ? L.map(function(b){
+      return '<button class="item" style="background:var(--bg);color:var(--ink);padding:12px 14px" data-bill="' + esc(b.id) + '"><b>' + esc(b.to) + '　' + yen(b.total) + '</b>' + st(b)
+        + (b.memo ? '<small style="color:var(--warn)">' + esc(b.memo) + '</small>' : '') + '</button>';
+    }).join('') : '<div class="card muted">この月の請求はまだありません。「下書きを作成」を押してください。</div>';
+  }
+  function billAct(action, data, msg){
+    return api(action, Object.assign({ month: billMonth }, data || {})).then(function(r){ if (msg) toast(typeof msg === 'function' ? msg(r) : msg); return loadBill(); }).catch(function(e){ toast(e.message); });
+  }
+  document.getElementById('bPrev').onclick = function(){ billMonth = ymNext(billMonth, -1); loadBill(); };
+  document.getElementById('bNext').onclick = function(){ billMonth = ymNext(billMonth, 1); loadBill(); };
+  document.getElementById('bBuild').onclick = function(){
+    var has = BILL && BILL.list.some(function(b){ return b.status === '下書き'; });
+    var rebuild = has && confirm('下書きを作り直しますか？\n（OK：下書きを消して作り直す／キャンセル：まだ作っていない家族の分だけ追加）');
+    billAct('sch_bill_build', { rebuild: rebuild }, function(r){ return r.made + '件の下書きを作りました'; });
+  };
+  document.getElementById('bConfirm').onclick = function(){
+    if (!confirm('下書きをすべて確定しますか？（確定すると、送付できるようになります）')) return;
+    billAct('sch_bill_confirm', {}, function(r){ return r.count + '件を確定しました'; });
+  };
+  document.getElementById('bSend').onclick = function(){
+    var n = BILL ? BILL.list.filter(function(b){ return b.status !== '下書き' && !b.sent; }).length : 0;
+    if (!n) { toast('送付する請求がありません（先に確定してください）'); return; }
+    if (!confirm(n + '件の請求を、保護者のLINE（LINE未登録ならメール）に送ります。よろしいですか？')) return;
+    billAct('sch_bill_send', {}, function(r){ return 'LINE ' + r.line + '件・メール ' + r.mail + '件を送りました' + (r.none.length ? '。送れなかった家庭：' + r.none.join('、') : ''); });
+  };
+  document.getElementById('bList').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-bill]'); if (!b) return;
+    billDetail(BILL.list.filter(function(x){ return x.id === b.dataset.bill; })[0]);
+  });
+  function billDetail(b){
+    var locked = b.status === '入金済み';
+    var rows = function(){ return b.items.map(function(i, k){
+      return '<div class="two" style="grid-template-columns:1fr 110px 34px;align-items:end;margin-top:6px" data-k="' + k + '">'
+        + '<label class="f">項目<input class="bl" value="' + esc(i.label) + '"' + (locked ? ' disabled' : '') + '></label>'
+        + '<label class="f">金額<input class="ba" type="number" step="100" value="' + i.amount + '"' + (locked ? ' disabled' : '') + '></label>'
+        + (locked ? '<span></span>' : '<button class="btn danger" style="padding:4px 8px" data-del="' + k + '" aria-label="この行を消す">×</button>') + '</div>'
+        + (i.note ? '<p class="muted" style="font-size:12px">' + esc(i.note) + '</p>' : '');
+    }).join(''); };
+    var link = b.token ? 'https://subschool0829.github.io/subsc/invoice.html#t=' + b.token : '';
+    openModal('<h3>' + esc(b.to) + '</h3><p class="muted">' + esc(b.id) + '　' + esc(b.status) + (b.sent ? '　' + esc(b.sent) + 'で送付（' + esc(b.sentAt) + '）' : '') + '</p>'
+      + (b.memo ? '<p style="color:var(--warn);font-size:13px">' + esc(b.memo) + '</p>' : '')
+      + '<div id="bRows">' + rows() + '</div>'
+      + (locked ? '' : '<button class="btn" id="bAdd" style="margin-top:8px">＋ 項目を追加（模試・テキスト代など）</button>')
+      + '<p style="margin-top:10px;font-weight:900;font-size:17px">合計 <span id="bTot">' + yen(b.total) + '</span></p>'
+      + (b.status !== '下書き' ? '<div style="margin-top:12px"><b>入金</b><div class="seg" id="bPay" style="margin-top:6px">'
+          + [['', '未入金'], ['現金', '現金で入金'], ['振込', '振込で入金']].map(function(s){ return '<button type="button" data-m="' + s[0] + '" aria-pressed="' + ((b.method || '') === s[0]) + '">' + s[1] + '</button>'; }).join('')
+          + '</div><label class="f" style="margin-top:6px">入金日<input type="date" id="bDate" value="' + (b.paidOn || D.today) + '"></label></div>' : '')
+      + (link ? '<p class="muted" style="margin-top:10px;font-size:12px;word-break:break-all">保護者用ページ：<a href="' + link + '" target="_blank" rel="noopener">開く</a></p>' : '')
+      + '<div class="acts">'
+      + (b.status === '下書き' ? '<button class="btn danger" id="bDel">削除</button>' : '')
+      + (b.status === '確定' && !b.sent ? '<button class="btn" id="bUnc">下書きに戻す</button>' : '')
+      + '<div class="r"><button class="btn" onclick="closeModal()">閉じる</button>'
+      + (locked ? '' : '<button class="btn pri" id="bSave">保存</button>')
+      + (b.status === '下書き' ? '<button class="btn yel" id="bOk">確定</button>' : '')
+      + (b.status !== '下書き' && !b.sent ? '<button class="btn yel" id="bSendOne">送付</button>' : '')
+      + '</div></div>');
+    var read = function(){
+      [].forEach.call(document.querySelectorAll('#bRows [data-k]'), function(el){
+        var k = +el.dataset.k; b.items[k].label = el.querySelector('.bl').value; b.items[k].amount = +el.querySelector('.ba').value || 0;
+      });
+    };
+    var retot = function(){ read(); document.getElementById('bTot').textContent = yen(b.items.reduce(function(a, i){ return a + i.amount; }, 0)); };
+    var box = document.getElementById('bRows');
+    box.oninput = retot;
+    box.onclick = function(ev){ var d = ev.target.closest('[data-del]'); if (!d) return; read(); b.items.splice(+d.dataset.del, 1); box.innerHTML = rows(); retot(); };
+    var add = document.getElementById('bAdd');
+    if (add) add.onclick = function(){ read(); b.items.push({ sid: '', label: '', amount: 0 }); box.innerHTML = rows(); var ls = box.querySelectorAll('.bl'); ls[ls.length - 1].focus(); };
+    var saveIt = function(){ read(); return api('sch_bill_save', { id: b.id, items: b.items }); };
+    var done = function(msg){ toast(msg); closeModal(); loadBill(); };
+    var on = function(id, fn){ var el = document.getElementById(id); if (el) el.onclick = fn; };
+    on('bSave', function(){ saveIt().then(function(){ done('保存しました'); }).catch(function(e){ toast(e.message); }); });
+    on('bOk', function(){ saveIt().then(function(){ return api('sch_bill_confirm', { id: b.id }); }).then(function(){ done('確定しました'); }).catch(function(e){ toast(e.message); }); });
+    on('bSendOne', function(){ if (!confirm(b.to + 'に請求を送りますか？')) return; (locked ? Promise.resolve() : saveIt()).then(function(){ return api('sch_bill_send', { id: b.id }); }).then(function(r){ done(r.line ? 'LINEで送りました' : r.mail ? 'メールで送りました' : '送り先が見つかりませんでした（LINE・メールとも未登録）'); }).catch(function(e){ toast(e.message); }); });
+    on('bDel', function(){ if (!confirm('この下書きを削除しますか？')) return; api('sch_bill_delete', { id: b.id }).then(function(){ done('削除しました'); }).catch(function(e){ toast(e.message); }); });
+    on('bUnc', function(){ api('sch_bill_unconfirm', { id: b.id }).then(function(){ done('下書きに戻しました'); }).catch(function(e){ toast(e.message); }); });
+    var pay = document.getElementById('bPay');
+    if (pay) pay.onclick = function(ev){
+      var x = ev.target.closest('button[data-m]'); if (!x) return;
+      api('sch_bill_pay', { id: b.id, method: x.dataset.m, date: document.getElementById('bDate').value }).then(function(){ done(x.dataset.m ? '入金済みにしました' : '未入金に戻しました'); }).catch(function(e){ toast(e.message); });
+    };
+  }
 
   // ===== タブ =====
   function showPanel(p){
