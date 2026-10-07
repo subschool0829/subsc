@@ -203,7 +203,12 @@
       <p style="text-align:center;margin-top:12px"><a class="btn" href="guide.html" target="_blank" rel="noopener" id="guideLink" hidden>保護者向け案内シートを印刷（1人1枚）</a></p>
     </div>
     <div class="card">
-      <h2>今日の出勤状況</h2>
+      <h2>QRの打ち忘れ</h2>
+<p class="muted">帰るときにQRをかざし忘れた生徒・メンターの退室（退勤）を、あとから記録できます。生徒は毎晩0時に自動で退室扱いになりますが、退室時刻は残らないので、ここで時刻を入れてください（ビジターの利用料もこの時刻で計算されます）。</p>
+<div id="attFix"><div class="loading">読み込み中…</div></div>
+</div>
+<div class="card">
+<h2>今日の出勤状況</h2>
       <div id="attList"></div>
     </div>
   </section>
@@ -257,7 +262,7 @@
       document.querySelector('#tabbar [data-p="bill"]').hidden = !r.me.owner;
       document.getElementById('guideLink').hidden = !r.me.admin;
       if (!document.querySelector('.panel.on')) showPanel('week');
-      renderWeek(); renderEvents(); renderQr(); loadReq(); loadMeal(); loadMoney();
+      renderWeek(); renderEvents(); renderQr(); loadAtt(); loadReq(); loadMeal(); loadMoney();
     }).catch(function(e){
       if (e.auth || !D) {
         document.getElementById('boot').outerHTML = '<div class="msg"><b>' + esc(e.message) + '</b><p class="muted" style="margin-top:8px">管理者から受け取った専用のURLで開いてください。</p></div>';
@@ -770,6 +775,49 @@
       return '<div class="att"><b>' + esc(m.name) + '</b>' + st + '</div>';
     }).join('');
   }
+
+  // ===== QRの打ち忘れ =====
+  var ATT = null;
+  function loadAtt(){
+    return api('sch_att_load').then(function(r){ ATT = r; renderAtt(); })
+      .catch(function(e){ document.getElementById('attFix').innerHTML = '<p class="muted">' + esc(e.message) + '</p>'; });
+  }
+  function renderAtt(){
+    var row = function(main, sub, btn){ return '<div class="att"><div><b>' + main + '</b><div class="muted">' + sub + '</div></div><div style="flex:none">' + btn + '</div></div>'; };
+    var sBtn = function(s, date, text){ return '<button class="btn" data-ao="s" data-id="' + s.sid + '" data-date="' + date + '" data-in="' + (s.in || s.since || '') + '" data-name="' + esc(s.name) + '">' + text + '</button>'; };
+    var h = '<p style="font-weight:900;margin-top:8px">在室中の生徒（' + ATT.inside.length + '人）</p>';
+    h += ATT.inside.length ? ATT.inside.map(function(s){ return row(esc(s.name), (s.since ? s.since + ' 入室' : ''), sBtn(s, ATT.today, '退室を記録')); }).join('') : '<p class="muted">いません</p>';
+    if (ATT.forgot.length) {
+      h += '<p style="font-weight:900;margin-top:14px">退室の打ち忘れ（0時に自動で退室扱い）</p>' + ATT.forgot.map(function(s){
+        return row(label(s.date) + ' ' + esc(s.name), (s.in ? s.in + ' 入室 → ' : '') + (s.fixed ? s.fixed + ' 退室（記録済み）' : '退室時刻なし'), s.fixed ? '<span class="on-badge">記録済み</span>' : sBtn(s, s.date, '退室時刻を入れる'));
+      }).join('');
+    }
+    var ms = ATT.mentors.filter(function(m){ return D.me.admin || m.mid === D.me.id; });
+    h += '<p style="font-weight:900;margin-top:14px">メンターの退勤</p>';
+    h += ms.length ? ms.map(function(m){
+      var td = m.date === ATT.today;
+      return row((td ? '今日' : label(m.date)) + ' ' + esc(m.name), m.since + ' 出勤' + (td ? '（出勤中）' : '（退勤の記録なし）'),
+        '<button class="btn" data-ao="m" data-id="' + m.mid + '" data-date="' + m.date + '" data-in="' + m.since + '" data-name="' + esc(m.name) + '">退勤を記録</button>');
+    }).join('') : '<p class="muted">退勤の記録漏れはありません</p>';
+    document.getElementById('attFix').innerHTML = h;
+  }
+  document.getElementById('attFix').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-ao]'); if (!b) return;
+    var isS = b.dataset.ao === 's', td = b.dataset.date === ATT.today;
+    var now = new Date(), nowHm = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+    openModal('<h3>' + (isS ? '退室を記録' : '退勤を記録') + '</h3><p><b>' + esc(b.dataset.name) + 'さん</b></p>'
+      + '<p class="muted">' + label(b.dataset.date) + (b.dataset.in ? ' ' + b.dataset.in + (isS ? ' 入室' : ' 出勤') : '') + '</p>'
+      + '<label class="f">' + (isS ? '退室' : '退勤') + 'した時刻<input type="time" id="aoT" step="300" value="' + (td ? nowHm : '') + '"></label>'
+      + (isS && td ? '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="aoN" style="width:auto;display:inline" checked>保護者にLINEで退室をお知らせする</label>' : '')
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="aoOk" data-label="記録する">記録する</button></div></div>');
+    document.getElementById('aoOk').onclick = function(){
+      if (!val('aoT')) { toast('時刻を入れてください'); return; }
+      var n = document.getElementById('aoN');
+      save(isS ? 'sch_att_student_out' : 'sch_att_mentor_out',
+        isS ? { sid: b.dataset.id, date: b.dataset.date, time: val('aoT'), notify: !!(n && n.checked) } : { mentorId: b.dataset.id, date: b.dataset.date, time: val('aoT') },
+        isS ? '退室を記録しました' : '退勤を記録しました', this);
+    };
+  });
 
   // ===== 授業依頼 =====
   var R = null;
