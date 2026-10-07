@@ -70,6 +70,13 @@
   .mrow select{font:inherit;font-size:16px;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;background:#fff}
   .mbtn{font:inherit;font-weight:900;font-size:15px;background:var(--ink);color:#fff;border:0;border-radius:999px;padding:9px 20px;cursor:pointer}
   .avname.off{color:#B3261E}
+  .thread{display:flex;flex-direction:column;margin-top:8px}
+  .bub{border-radius:10px;padding:6px 10px;margin-top:6px;font-size:14px;max-width:88%;white-space:pre-wrap;word-break:break-word;background:#fff}
+  .bub small{display:block;font-size:11px;color:var(--sub)}
+  .bub.mine{background:var(--tint);margin-left:auto}
+  .reply{display:flex;gap:6px;margin-top:8px;align-items:stretch}
+  .reply textarea{flex:1;min-height:44px;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:16px;background:#fff;resize:vertical}
+  .reply button{border:0;border-radius:10px;background:var(--ink);color:#fff;font:inherit;font-weight:900;padding:0 16px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -236,7 +243,7 @@
     }).join('') : '<p class="empty">予定されている授業はありません。</p>';
 
     var rs = D.requests.filter(function(r){ return r.sid === cur; });
-    var order = { '変更依頼中': 0, '受付待ち': 1, '確定': 2, '却下': 3, '取消': 4 };
+    var order = { '差し戻し': 0, '変更依頼中': 0, '受付待ち': 1, '確定': 2, '却下': 3, '取消': 4 };
     rs.sort(function(a, b){ return (order[a.status] - order[b.status]) || (a.created < b.created ? 1 : -1); });
     document.getElementById('reqs').innerHTML = rs.length ? rs.map(reqCard).join('') : '<p class="empty">申し込み中の授業はありません。</p>';
     renderAv('avMain');
@@ -244,21 +251,28 @@
   }
 
   function reqCard(r){
-    var cls = { '受付待ち':'wait', '変更依頼中':'change', '確定':'ok', '却下':'ng', '取消':'cancel' }[r.status] || 'wait';
-    var name = { '受付待ち':'お返事待ち', '変更依頼中':'日時のご相談', '確定':'決まりました', '却下':'お受けできませんでした', '取消':'取り消し済み' }[r.status] || r.status;
+    var cls = { '受付待ち':'wait', '変更依頼中':'change', '差し戻し':'change', '確定':'ok', '却下':'ng', '取消':'cancel' }[r.status] || 'wait';
+    var name = { '受付待ち':'お返事待ち', '変更依頼中':'日時のご相談', '差し戻し':'内容の確認をお願いします', '確定':'決まりました', '却下':'お受けできませんでした', '取消':'取り消し済み' }[r.status] || r.status;
     var h = '<div class="card"><div><b>' + esc(r.created.slice(5, 10).replace('-', '/')) + ' の申し込み</b><span class="st ' + cls + '">' + name + '</span></div>';
     if (r.status === '変更依頼中') {
       if (r.message) h += '<div class="msg">' + esc(r.message) + '</div>';
       h += '<p class="sub" style="margin-top:8px">ご提案の日時から選んでください。選ぶとその日時で決まります。</p>';
       h += r.proposals.map(function(s, i){ return '<button class="choose" data-choose="' + r.id + '" data-i="' + i + '">' + slotText(s) + (r.mentor ? '<span class="sub" style="display:block;font-weight:500">担当：' + esc(r.mentor) + '</span>' : '') + '</button>'; }).join('');
-      h += '<p class="sub" style="margin-top:8px">どれも合わない場合は、この申し込みを取り消して、別の日時で申し込んでください。</p>';
+      h += '<p class="sub" style="margin-top:8px">どれも合わない場合は、下のメッセージでご相談いただくか、この申し込みを取り消して別の日時で申し込んでください。</p>';
     } else {
-      h += '<ul class="slots">' + r.slots.map(function(s, i){ return '<li>第' + (i+1) + '希望　' + slotText(s) + '</li>'; }).join('') + '</ul>';
+      h += '<ul class="slots">' + r.slots.map(function(s, i){ return '<li>第' + (i+1) + '希望 ' + slotText(s) + '</li>'; }).join('') + '</ul>';
+      if (r.status === '差し戻し') {
+        h += '<p class="sub" style="margin-top:8px">メンターから確認のお願いです。日時や内容を直して、送り直してください。</p>';
+        h += '<button class="choose" data-edit="' + r.id + '">日時・内容を直して送り直す</button>';
+      }
       if (r.status === '却下' && r.message) h += '<div class="msg">' + esc(r.message) + '</div>';
     }
     if (r.content) h += '<div class="sub" style="margin-top:6px">内容：' + esc(r.content) + '</div>';
     if (r.prefMentor) h += '<div class="sub">希望メンター：' + esc(r.prefMentor) + 'さん</div>';
-    if (r.status === '受付待ち' || r.status === '変更依頼中') h += '<button class="link" data-cancel="' + r.id + '">この申し込みを取り消す</button>';
+    var ms = r.messages || [];
+    if (ms.length) h += '<div class="thread">' + ms.map(function(m){ return '<div class="bub' + (m.mentor ? '' : ' mine') + '"><small>' + (m.mentor ? 'メンター ' + esc(m.name) : esc(m.name)) + '　' + esc(String(m.at).slice(5).replace('-', '/')) + '</small>' + esc(m.text) + '</div>'; }).join('') + '</div>';
+    if (r.status !== '取消') h += '<div class="reply"><textarea id="rm_' + r.id + '" maxlength="300" placeholder="メンターへのメッセージ（質問・ご相談など）" aria-label="メンターへのメッセージ"></textarea><button data-send="' + r.id + '">送る</button></div>';
+    if (r.status === '受付待ち' || r.status === '変更依頼中' || r.status === '差し戻し') h += '<button class="link" data-cancel="' + r.id + '">この申し込みを取り消す</button>';
     return h + '</div>';
   }
 
@@ -276,6 +290,15 @@
       if (!confirm('この申し込みを取り消しますか？')) return;
       b.disabled = true;
       api('req_cancel', { id: b.dataset.cancel }).then(function(){ toast('取り消しました'); return load(); }).catch(function(e){ toast(e.message); b.disabled = false; });
+    }
+    if (b.dataset.edit) {
+      openEdit(D.requests.filter(function(x){ return x.id === b.dataset.edit; })[0]);
+    }
+    if (b.dataset.send) {
+      var ta = document.getElementById('rm_' + b.dataset.send), text = ta.value.trim();
+      if (!text) { toast('メッセージを入力してください'); return; }
+      b.disabled = true;
+      api('req_msg', { id: b.dataset.send, text: text }).then(function(){ toast('メッセージを送りました'); return load(); }).catch(function(e){ toast(e.message); b.disabled = false; });
     }
   });
 
@@ -305,7 +328,28 @@
     var n = document.getElementById('fixNote');
     if (n) n.textContent = f ? 'このメンターの授業は、開始時刻が決まっています（' + f.core.join('・') + '）。' + (f.extra.length ? f.extra.join('・') + 'はコアタイム外のため要相談です。' : '') : '';
   }
+  var editId = null;
+  function openEdit(r){
+    if (!r) return;
+    openForm();
+    if (document.getElementById('form').hidden) return;
+    editId = r.id;
+    document.getElementById('fMentor').value = r.prefMentorId || '';
+    applyTimes();
+    r.slots.forEach(function(s, k){
+      document.getElementById('d' + k).value = s.date;
+      var sel = document.getElementById('t' + k);
+      if (![].some.call(sel.options, function(o){ return o.value === s.start; })) { var o = document.createElement('option'); o.value = s.start; o.textContent = s.start; sel.appendChild(o); }
+      sel.value = s.start;
+    });
+    document.getElementById('fContent').value = r.content || '';
+    document.getElementById('fWith').value = r.withWho || '';
+    document.getElementById('fMemo').value = r.memo || '';
+    for (var k = 0; k < 3; k++) hint(k);
+    document.getElementById('sendBtn').textContent = '直した内容で送り直す';
+  }
   function openForm(){
+    editId = null; document.getElementById('sendBtn').textContent = 'この内容で申し込む';
     if (D.openFrom && D.today < D.openFrom) { toast('授業の申し込みは' + label(D.openFrom) + 'から受け付けます'); return; }
     var st = D.students.filter(function(s){ return s.id === cur; })[0];
     document.getElementById('formWho').innerHTML = '<p><b>' + esc(st.name) + 'さん</b>の授業を申し込みます。</p>'
@@ -365,10 +409,10 @@
     if (!slots.length) { err.textContent = '第1希望の日時を選んでください'; return; }
     err.textContent = '';
     var btn = this; btn.disabled = true; btn.textContent = '送信中…';
-    api('req_create', { studentId: cur, slots: slots, mentorId: document.getElementById('fMentor').value, content: document.getElementById('fContent').value, with: document.getElementById('fWith').value, memo: document.getElementById('fMemo').value })
-      .then(function(){ toast('申し込みました。お返事は公式LINEでお送りします'); closeForm(); return load(); })
+    api(editId ? 'req_resubmit' : 'req_create', { id: editId, studentId: cur, slots: slots, mentorId: document.getElementById('fMentor').value, content: document.getElementById('fContent').value, with: document.getElementById('fWith').value, memo: document.getElementById('fMemo').value })
+      .then(function(){ toast(editId ? '送り直しました。お返事は公式LINEでお送りします' : '申し込みました。お返事は公式LINEでお送りします'); closeForm(); return load(); })
       .catch(function(e){ err.textContent = e.message; })
-      .then(function(){ btn.disabled = false; btn.textContent = 'この内容で申し込む'; });
+      .then(function(){ btn.disabled = false; btn.textContent = editId ? '直した内容で送り直す' : 'この内容で申し込む'; });
   };
 
   // ===== メンターの空き状況 =====

@@ -130,6 +130,12 @@
   .fchk small{display:block;font-size:12px;color:var(--sub)}
   .fnote{flex:1;min-width:160px;padding:6px 10px;border:1.5px solid var(--line);border-radius:8px;font:inherit;font-size:14px;background:var(--bg)}
   :focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+.thread{display:flex;flex-direction:column;margin-top:8px}
+.bub{border-radius:10px;padding:6px 10px;margin-top:6px;font-size:14px;max-width:88%;white-space:pre-wrap;word-break:break-word}
+.bub small{display:block;font-size:11px;color:var(--sub)}
+.bub.me{background:var(--tint);margin-left:auto}
+.bub.them{background:var(--soft)}
+.newmsg{color:#fff;background:var(--warn);border-radius:999px;font-weight:900;font-size:11px;padding:0 8px;margin-left:6px}
 </style>
 </head>
 <body>
@@ -152,7 +158,7 @@
   </section>
 
   <section class="panel" id="p-req">
-    <p class="muted">生徒・保護者は、公式LINEで「授業」と送ると届く専用ページから申し込みます。受付・変更依頼・却下の結果は、公式LINEで本人に届きます。</p>
+    <p class="muted">生徒・保護者は、公式LINEで「授業」と送ると届く専用ページから申し込みます。受付・変更依頼・差し戻し・却下・メッセージは、公式LINEで本人に届きます。生徒・保護者からの返信もここに表示されます。</p>
     <div id="reqList"><div class="loading">読み込み中…</div></div>
   </section>
 
@@ -322,7 +328,7 @@
           var cancel = o.status !== '予定';
           var ws = cancel ? [] : lessonWarnings(o);
           html += '<button class="item lesson' + (o.kind === '講座' ? ' kouza' : '') + (cancel ? ' cancel' : '') + '" data-lesson="' + o.id + '"><span class="t">' + o.start + '〜' + o.end + '</span>' + (o.kind === '講座' ? '講座　' : '授業　') + esc(o.title || o.names)
-            + (o.count >= 2 ? '<span class="tag">' + o.count + '人</span>' : '') + (cancel ? '<span class="tag">' + esc(o.status) + '</span>' : '')
+            + (o.kind === '講座' && o.fee ? '<span class="tag">' + o.fee.toLocaleString() + '円</span>' : '') + (o.count >= 2 ? '<span class="tag">' + o.count + '人</span>' : '') + (cancel ? '<span class="tag">' + esc(o.status) + '</span>' : '')
             + '<small>' + (o.content ? esc(o.content) + '　' : '') + '担当：' + esc(o.mentor || '未定') + '</small>'
             + ws.map(function(x){ return '<span class="warn">⚠ ' + esc(x) + '</span>'; }).join('') + '</button>';
         } else {
@@ -488,7 +494,7 @@
       + '<div class="acts"><div class="r"><button class="btn" id="mvNo">やめる</button><button class="btn pri" id="mvOk" data-label="移動する">移動する</button></div></div>');
     document.getElementById('mvNo').onclick = closeModal;
     document.getElementById('mvOk').onclick = function(){
-      save('sch_lesson_save', { id: l.id, date: nd, start: ns, end: ne, students: l.students, mentorId: nm, content: l.content, status: l.status, memo: l.memo, kind: l.kind, target: l.target, notify: !!(document.getElementById('mvNt') && document.getElementById('mvNt').checked) }, '移動しました', this);
+      save('sch_lesson_save', { id: l.id, date: nd, start: ns, end: ne, students: l.students, mentorId: nm, content: l.content, status: l.status, memo: l.memo, kind: l.kind, target: l.target, fee: l.fee || 0, notify: !!(document.getElementById('mvNt') && document.getElementById('mvNt').checked) }, '移動しました', this);
     };
   }
   function moveEventConfirm(e, ns, ne, nm){
@@ -518,7 +524,7 @@
   function toast(t){ var el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function(){ el.classList.remove('on'); }, 2400); }
   function save(action, data, msg, btn){
     if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
-    return api(action, data).then(function(){ closeModal(); toast(msg || '保存しました'); return load(); })
+    return api(action, data).then(function(r){ closeModal(); toast(msg || '保存しました'); if (r && r.notice) setTimeout(function(){ alert(r.notice); }, 60); return load(); })
       .catch(function(e){ toast(e.message); if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || '保存'; } });
   }
   function confirmDel(text, action, data){
@@ -613,7 +619,7 @@
       + '<label class="f">' + (isNew ? '日付（くり返す場合は初回）' : '日付') + '<input type="date" id="lD" value="' + l.date + '"></label>'
       + '<div class="two"><label class="f">開始<input type="time" id="lS" value="' + l.start + '" step="300"></label><label class="f">終了<input type="time" id="lE" value="' + l.end + '" step="300"></label></div>'
       + '<label class="f" id="lGW">対象<select id="lG"><option value="">選ぶ</option>' + TARGETS.map(function(t){ return '<option' + (t === l.target ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></label>'
-      + '<label class="f"><span id="lQL">生徒（最大4人）</span><input id="lQ" placeholder="名前で検索" autocomplete="off"></label>'
+      + '<label class="f" id="lFW">参加費（1人あたり・円）<input type="number" id="lF" min="0" step="100" inputmode="numeric" value="' + (l.fee || '') + '" placeholder="無料なら空欄"></label><label class="f"><span id="lQL">生徒（最大4人）</span><input id="lQ" placeholder="名前で検索" autocomplete="off"></label>'
       + '<div class="chips" id="lChips"></div><div class="picker" id="lPick"></div>'
       + '<label class="f">担当<select id="lM"><option value="">未定</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '"' + (m.id === l.mentorId ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>'
       + '<label class="f"><span id="lCL">内容（任意）</span><input id="lC" value="' + esc(l.content) + '" maxlength="60"></label>'
@@ -631,7 +637,8 @@
       var k = lKind === '講座';
       [].forEach.call(document.querySelectorAll('#lK button'), function(b){ b.setAttribute('aria-pressed', b.dataset.v === lKind ? 'true' : 'false'); });
       document.getElementById('lGW').style.display = k ? '' : 'none';
-      document.getElementById('lQL').textContent = k ? '参加者（任意・集計用。非会員は2,000円）' : '生徒（最大4人）';
+    document.getElementById('lFW').style.display = k ? '' : 'none';
+      document.getElementById('lQL').textContent = k ? '参加者（参加費は選んだ人の月謝に加算。参加費が空欄なら会員は無料・非会員は2,000円）' : '生徒（最大4人）';
       document.getElementById('lCL').textContent = k ? '科目・内容（例：数学）' : '内容（任意）';
       document.getElementById('lC').placeholder = k ? '例：数学' : '例：数学　関数';
       refreshLesson(l.id);
@@ -640,11 +647,11 @@
       var on = document.getElementById('lRp').checked;
       document.getElementById('lUW').style.display = on ? '' : 'none';
       var n = repeatDates(val('lD'), val('lU'), 'weekly').length;
-      document.getElementById('lCnt').textContent = on ? n + '回分を登録します' : '';
+      document.getElementById('lCnt').textContent = on ? n + '回分（担当メンターの在室予定がない日は入りません）' : '';
     }
     var startEl = document.getElementById('lS'), endEl = document.getElementById('lE');
     startEl.addEventListener('change', function(){ if (startEl.value) endEl.value = addMin(startEl.value, LESSON_MIN); refreshLesson(l.id); });
-    ['lD','lE','lM'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ refreshLesson(l.id); }); });
+    ['lD','lE','lM','lF'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ refreshLesson(l.id); }); });
     if (isNew) {
       document.getElementById('lK').onclick = function(ev){ var b = ev.target.closest('button'); if (b) { lKind = b.dataset.v; if (lKind === '個別' && picked.length > 4) picked = picked.slice(0, 4); kindUI(); } };
       document.getElementById('lRp').onchange = repUI;
@@ -665,7 +672,7 @@
       if (lKind === '講座' && !val('lG')) { toast('講座の対象を選んでください'); return; }
       var dates = isNew && document.getElementById('lRp').checked ? repeatDates(val('lD'), val('lU'), 'weekly') : null;
       var nt = document.getElementById('lNt');
-      save('sch_lesson_save', { id: isNew ? '' : l.id, kind: lKind, target: val('lG'), date: val('lD'), dates: dates, start: val('lS'), end: val('lE'), students: picked, mentorId: val('lM'), content: val('lC'), status: isNew ? '予定' : val('lT'), memo: val('lN'), notify: !!(nt && nt.checked) },
+      save('sch_lesson_save', { id: isNew ? '' : l.id, kind: lKind, target: val('lG'), fee: lKind === '講座' ? (+val('lF') || 0) : 0, date: val('lD'), dates: dates, start: val('lS'), end: val('lE'), students: picked, mentorId: val('lM'), content: val('lC'), status: isNew ? '予定' : val('lT'), memo: val('lN'), notify: !!(nt && nt.checked) },
         dates && dates.length > 1 ? dates.length + '回分を登録しました' : '保存しました', this);
     };
     if (!isNew) document.getElementById('lDel').onclick = function(){ delSeries('この' + (lKind === '講座' ? '講座' : '授業') + 'を削除しますか？（キャンセルの場合は「状態」を変えてください）', 'sch_lesson_delete', l.id, l.series); };
@@ -684,7 +691,7 @@
     renderPicker();
     var cur = { id: id, kind: lKind, date: val('lD'), start: val('lS'), end: val('lE'), mentorId: val('lM'), students: picked };
     var ws = (cur.date && cur.start && cur.end) ? lessonWarnings(cur, id) : [];
-    var info = lKind === '個別' && picked.length >= 2 ? picked.length + '人で受講（2人以上の料金）' : lKind === '講座' && picked.length ? '参加者 ' + picked.length + '人' : '';
+    var info = lKind === '個別' && picked.length >= 2 ? picked.length + '人で受講（2人以上の料金）' : lKind === '講座' && picked.length ? '参加者 ' + picked.length + '人' + (+val('lF') > 0 ? '（参加費 ' + (+val('lF')).toLocaleString() + '円 × ' + picked.length + '人 ＝ ' + (+val('lF') * picked.length).toLocaleString() + '円）' : '') : '';
     document.getElementById('lWarn').innerHTML = (info ? '<span class="warn" style="background:var(--lesson);color:var(--lessonInk)">' + esc(info) + '</span>' : '')
       + ws.map(function(w){ return '<span class="warn">⚠ ' + esc(w) + '</span>'; }).join('');
   }
@@ -781,28 +788,42 @@
     if (a.others.length) h.push('<span class="warn">同じ時間の依頼：' + a.others.map(esc).join('、') + '</span>');
     return '<div class="info">' + h.join('') + '</div>';
   }
+  function thread(r){
+    var ms = r.messages || [];
+    if (!ms.length) return '';
+    return '<div class="thread">' + ms.map(function(m){ return '<div class="bub ' + (m.mentor ? 'me' : 'them') + '"><small>' + esc(m.name) + '　' + esc(String(m.at).slice(5).replace('-', '/')) + '</small>' + esc(m.text) + '</div>'; }).join('') + '</div>';
+  }
+  function needReply(r){ var ms = r.messages || []; return ms.length > 0 && !ms[ms.length - 1].mentor; }
+  function findReq(id){ return find(R.requests, id) || find(R.done, id); }
   function renderReq(){
     var wait = R.requests.filter(function(r){ return r.status === '受付待ち'; });
-    var chg = R.requests.filter(function(r){ return r.status === '変更依頼中'; });
-    var badge = document.getElementById('reqBadge'); badge.hidden = !wait.length; badge.textContent = wait.length;
+    var chg = R.requests.filter(function(r){ return r.status === '変更依頼中' || r.status === '差し戻し'; });
+    var n = wait.length + R.requests.concat(R.done).filter(function(r){ return r.status !== '受付待ち' && needReply(r); }).length;
+    var badge = document.getElementById('reqBadge'); badge.hidden = !n; badge.textContent = n;
+    var nt = function(r){ return needReply(r) ? '<span class="newmsg">返信あり</span>' : ''; };
+    var mb = function(r){ return '<button class="btn" data-msg="' + r.id + '">メッセージ</button>'; };
     var html = '<h2>お返事待ち（' + wait.length + '）</h2>';
     html += wait.length ? wait.map(function(r){
-      return '<div class="card"><div class="row"><b>' + esc(r.sname) + 'さん</b><span class="muted">' + esc(r.created.slice(5).replace('-', '/')) + (r.requester ? '　' + esc(r.requester) : '') + '</span></div>'
+      return '<div class="card"><div class="row"><b>' + esc(r.sname) + 'さん' + nt(r) + '</b><span class="muted">' + esc(r.created.slice(5).replace('-', '/')) + (r.requester ? ' ' + esc(r.requester) : '') + '</span></div>'
         + (r.content ? '<div>内容：' + esc(r.content) + '</div>' : '') + (r.prefMentor ? '<div>希望メンター：<b>' + esc(r.prefMentor) + '</b></div>' : '') + (r.withWho ? '<div>一緒に：' + esc(r.withWho) + '</div>' : '') + (r.memo ? '<div class="muted">' + esc(r.memo) + '</div>' : '')
-        + r.slotInfo.map(function(a, i){ return '<div class="slot"><div class="row"><b>第' + (i+1) + '希望　' + slotLine(a) + '</b><button class="btn pri" data-acc="' + r.id + '" data-i="' + i + '">受付</button></div>' + infoHtml(a) + '</div>'; }).join('')
-        + '<div class="acts"><button class="btn" data-prop="' + r.id + '">変更依頼</button><button class="btn danger" data-rej="' + r.id + '">却下</button></div></div>';
+        + r.slotInfo.map(function(a, i){ return '<div class="slot"><div class="row"><b>第' + (i+1) + '希望 ' + slotLine(a) + '</b><button class="btn pri" data-acc="' + r.id + '" data-i="' + i + '">受付</button></div>' + infoHtml(a) + '</div>'; }).join('')
+        + thread(r)
+        + '<div class="acts">' + mb(r) + '<button class="btn" data-prop="' + r.id + '">変更依頼</button><button class="btn" data-ret="' + r.id + '">差し戻し</button><button class="btn danger" data-rej="' + r.id + '">却下</button></div></div>';
     }).join('') : '<div class="card muted">お返事待ちの依頼はありません</div>';
     if (chg.length) {
       html += '<h2>生徒の返事待ち（' + chg.length + '）</h2>' + chg.map(function(r){
-        return '<div class="card"><b>' + esc(r.sname) + 'さん</b><span class="muted">　日時を提案済み</span>'
-          + r.proposalInfo.map(function(a){ return '<div class="slot"><b>' + slotLine(a) + '</b>' + infoHtml(a) + '</div>'; }).join('')
-          + (r.message ? '<div class="muted" style="margin-top:6px">送った連絡：' + esc(r.message) + '</div>' : '')
-          + '<div class="acts"><button class="btn" data-prop="' + r.id + '">提案をやり直す</button><button class="btn danger" data-rej="' + r.id + '">却下</button></div></div>';
+        var ret = r.status === '差し戻し';
+        return '<div class="card"><b>' + esc(r.sname) + 'さん' + nt(r) + '</b><span class="muted"> ' + (ret ? '差し戻し中（生徒・保護者が直して送り直します）' : '日時を提案済み') + '</span>'
+          + (ret ? r.slots.map(function(s, i){ return '<div class="muted">第' + (i+1) + '希望 ' + label(s.date) + ' ' + s.start + '〜</div>'; }).join('') : r.proposalInfo.map(function(a){ return '<div class="slot"><b>' + slotLine(a) + '</b>' + infoHtml(a) + '</div>'; }).join(''))
+          + (r.message && !ret ? '<div class="muted" style="margin-top:6px">送った連絡：' + esc(r.message) + '</div>' : '')
+          + thread(r)
+          + '<div class="acts">' + mb(r) + '<button class="btn" data-prop="' + r.id + '">' + (ret ? '日時を提案' : '提案をやり直す') + '</button><button class="btn danger" data-rej="' + r.id + '">却下</button></div></div>';
       }).join('');
     }
     if (R.done.length) {
       html += '<h2>最近の対応</h2>' + R.done.map(function(r){
-        return '<div class="card muted"><b>' + esc(r.sname) + 'さん</b>　' + esc(r.status) + (r.status === '確定' && r.mentor ? '（担当：' + esc(r.mentor) + '）' : '') + '<br>' + esc(r.updated) + '</div>';
+        return '<div class="card' + (needReply(r) ? '' : ' muted') + '"><b>' + esc(r.sname) + 'さん</b> ' + esc(r.status) + (r.status === '確定' && r.mentor ? '（担当：' + esc(r.mentor) + '）' : '') + nt(r) + '<br><span class="muted">' + esc(r.updated) + '</span>'
+          + thread(r) + (r.status === '取消' ? '' : '<div class="acts">' + mb(r) + '</div>') + '</div>';
       }).join('');
     }
     document.getElementById('reqList').innerHTML = html;
@@ -812,7 +833,28 @@
     if (b.dataset.acc) return reqAccept(find(R.requests, b.dataset.acc), +b.dataset.i);
     if (b.dataset.prop) return reqPropose(find(R.requests, b.dataset.prop));
     if (b.dataset.rej) return reqReject(find(R.requests, b.dataset.rej));
+    if (b.dataset.ret) return reqReturn(find(R.requests, b.dataset.ret));
+    if (b.dataset.msg) return reqMsg(findReq(b.dataset.msg));
   });
+  function reqMsg(r){
+    openModal('<h3>メッセージ：' + esc(r.sname) + 'さん</h3>' + (thread(r) || '<p class="muted">まだメッセージはありません。</p>')
+      + '<label class="f">メッセージ（生徒・保護者の公式LINEに届きます。返信はこの依頼に表示されます）<textarea id="gMsg" maxlength="300" placeholder="例：内容について確認させてください。どの単元を見てほしいですか？"></textarea></label>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">閉じる</button><button class="btn pri" id="gOk" data-label="送る">送る</button></div></div>');
+    document.getElementById('gOk').onclick = function(){
+      if (!val('gMsg')) { toast('メッセージを入力してください'); return; }
+      reqSave('sch_req_msg', { id: r.id, text: val('gMsg') }, 'メッセージを送りました', this);
+    };
+  }
+  function reqReturn(r){
+    openModal('<h3>差し戻し：' + esc(r.sname) + 'さん</h3><p class="muted">生徒・保護者に、日時や内容を直して送り直してもらいます。直してほしいことを書いてください（公式LINEに届きます）。</p>'
+      + thread(r)
+      + '<label class="f">直してほしいこと<textarea id="gRet" maxlength="300" placeholder="例：その日はメンターが不在です。16:00以降の時間で選び直してください。"></textarea></label>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="gROk" data-label="差し戻す">差し戻す</button></div></div>');
+    document.getElementById('gROk').onclick = function(){
+      if (!val('gRet')) { toast('直してほしいことを入力してください'); return; }
+      reqSave('sch_req_return', { id: r.id, text: val('gRet') }, '差し戻しました', this);
+    };
+  }
   function reqSave(action, data, msg, btn){
     btn.disabled = true; btn.textContent = '送信中…';
     return api(action, data).then(function(){ closeModal(); toast(msg); return load(); })
