@@ -158,7 +158,7 @@
     if (busy || video.readyState < 2) { setTimeout(scanLoop, 250); return; }
     if (detector) {
       detector.detect(video).then(function(codes){
-        if (codes && codes.length) onCode(codes[0].rawValue);
+        if (codes && codes.length) near(codes[0].rawValue, codes[0].boundingBox ? codes[0].boundingBox.width / (video.videoWidth || 1) : 1); else near('', 0);
       }).catch(function(){ detector = null; }).then(function(){ setTimeout(scanLoop, 200); });
     } else {
       var w = 480, h = Math.round(video.videoHeight * w / video.videoWidth) || 360;
@@ -167,12 +167,20 @@
       ctx.drawImage(video, 0, 0, w, h);
       var img = ctx.getImageData(0, 0, w, h);
       var code = window.jsQR ? jsQR(img.data, w, h, { inversionAttempts:'dontInvert' }) : null;
-      if (code && code.data) onCode(code.data);
+      if (code && code.data) { var L = code.location; near(code.data, L ? Math.abs(L.topRightCorner.x - L.topLeftCorner.x) / w : 1); } else near('', 0);
       setTimeout(scanLoop, 200);
     }
   }
 
-  function onCode(text){
+  // 近くでかざしたQRだけ読む（遠くに写りこんだカード・紙のQRで勝手に打刻されないように）
+var MIN_QR_RATIO = 0.15; // 画面の幅に対するQRの大きさ（これより小さい＝遠いものは無視）
+var candText = '', candCount = 0;
+function near(text, ratio){
+  if (!text || ratio < MIN_QR_RATIO) { candText = ''; candCount = 0; return; }
+  if (text === candText) candCount++; else { candText = text; candCount = 1; }
+  if (candCount >= 2) { candCount = 0; onCode(text); }
+}
+function onCode(text){
     if (busy) return;
     var now = Date.now();
     if (text === lastText && now - lastTime < 6000) return;
