@@ -56,6 +56,13 @@
   .ml{position:absolute;top:3px;bottom:3px;border-radius:5px;font-size:11px;font-weight:700;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:24px;background:#FAC775;color:#633806;z-index:1}
   .nomt{color:#B3261E;font-size:13px;font-weight:900;margin-left:8px}
   .nm.off{color:#B3261E}
+.cmsg{margin-top:8px;background:#fff;border-radius:10px;padding:8px 12px;font-weight:700;white-space:pre-wrap;line-height:1.5}
+.cmsg small{display:block;font-size:11px;color:var(--sub);font-weight:700}
+.kz{margin-top:10px;padding-top:8px;border-top:1px dashed rgba(0,0,0,.18)}
+.kzt{font-weight:900;font-size:14px}
+.kzl{font-weight:700;margin-top:2px}
+.kzm{font-variant-numeric:tabular-nums;margin-right:8px}
+.kzl small{color:var(--sub);font-weight:500}
 </style>
 </head>
 <body>
@@ -78,11 +85,22 @@
 <script>
   var GAS_URL = 'https://script.google.com/macros/s/AKfycbwoPiOpPmUcykIrgUGYj5f0z1jnPA6gH3cU2aUDsqSLVKlAB9CytbtpYb8iqHAS81kQ-g/exec';
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-  function renderNow(n){
+  function kshort(l){
+  var g = String(l.target || ''), c = String(l.content || '').replace(/\s|講座/g, '');
+  var gm = { '小学生': '小', '高校生': '高', '全学年': '全' };
+  g = gm[g] || g.replace(/[0-9]/g, function(d){ return String.fromCharCode(d.charCodeAt(0) + 0xFEE0); });
+  return (g || c) ? g + (c ? c.charAt(0) : '講') : (l.title || '講座');
+}
+function nowMsg(n){ return n.msg && n.msg.text ? '<div class="cmsg"><small>教室から</small>' + esc(n.msg.text) + '</div>' : ''; }
+function nowKouza(n){
+  if (!n.kouza || !n.kouza.length) return '';
+  return '<div class="kz"><div class="kzt">今日の講座</div>' + n.kouza.map(function(k){ return '<div class="kzl"><span class="kzm">' + k.start + '〜' + k.end + '</span>' + esc(k.name) + (k.mentor ? '<small>（' + esc(k.mentor) + '）</small>' : '') + '</div>'; }).join('') + '</div>';
+}
+function renderNow(n){
     var el = document.getElementById('now'); if (!el || !n) return;
-    el.innerHTML = '<div class="nowt">いまの教室<small>' + esc(n.at) + ' 現在</small></div>'
+    el.innerHTML = '<div class="nowt">いまの教室<small>' + esc(n.at) + ' 現在</small></div>' + nowMsg(n)
       + '<div class="nowr"><span class="big">' + n.students + '</span>人が在室中</div>'
-      + '<div class="nowm">' + n.mentors.map(function(m){ return '<span class="mt' + (m.in ? ' on' : '') + '">' + esc(m.name) + (m.in ? '　出勤中' : '　不在') + '</span>'; }).join('') + '</div>';
+      + '<div class="nowm">' + n.mentors.map(function(m){ return '<span class="mt' + (m.in ? ' on' : '') + '">' + esc(m.name) + (m.in ? '　出勤中' : '　不在') + '</span>'; }).join('') + '</div>' + nowKouza(n);
   }
   function hhmm(m){ return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); }
   function mins(t){ var p = String(t).split(':'); return (+p[0])*60 + (+p[1]); }
@@ -110,7 +128,7 @@
         mentors.forEach(function(m){
           rows += '<div class="row"><div class="nm' + (get(d, m.id).length ? '' : ' off') + '">' + esc(m.name) + '</div><div class="tr" style="--hw:' + hw + '%">'
             + get(d, m.id).map(function(x){ return '<span class="bar" style="' + pos(x[0], x[1]) + '" title="' + esc(m.name + ' ' + x[0] + '〜' + x[1]) + '">' + x[0] + '〜' + x[1] + '</span>'; }).join('')
-            + (d.lessons || []).filter(function(l){ return l.m === m.id; }).map(function(l){ var k = l.kind === '講座'; return '<span class="ls' + (k ? ' k' : '') + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + (k ? l.title : '授業')) + '">' + (k ? esc(l.title) : '') + '</span>'; }).join('') + '</div></div>';
+            + (d.lessons || []).filter(function(l){ return l.m === m.id; }).map(function(l){ var k = l.kind === '講座'; return '<span class="ls' + (k ? ' k' : '') + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + (k ? l.title : '授業')) + '">' + (k ? esc(kshort(l)) : '') + '</span>'; }).join('') + '</div></div>';
         });
         rows += '<div class="row"><div class="nm">行事</div><div class="tr" style="--hw:' + hw + '%">'
           + d.events.map(function(e){ return '<span class="ev" style="' + pos(e.start, e.end) + '" title="' + esc(e.start + '〜' + e.end + ' ' + e.name) + '">' + esc(e.name) + '</span>'; }).join('')

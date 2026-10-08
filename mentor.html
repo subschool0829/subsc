@@ -145,6 +145,7 @@
   <div id="boot" class="loading">読み込み中…</div>
 
   <section class="panel" id="p-week">
+<div class="card" id="cmsgBox" hidden><div class="row"><b>教室からのメッセージ</b><span class="muted" id="cmsgAt"></span></div><p class="muted" style="font-size:12px">「在室・行事」ページの「いまの教室」の欄に表示されます。空にして保存すると消えます。</p><textarea id="cmsgT" maxlength="200" rows="2" placeholder="例：今日は18時からテスト対策講座があります" style="display:block;width:100%;margin-top:6px;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:16px"></textarea><div style="text-align:right;margin-top:6px"><button class="btn pri" id="cmsgSave">保存</button></div></div>
     <div class="weeknav">
       <button class="btn" id="prevW" aria-label="前の週">◀</button>
       <b id="weekLabel"></b>
@@ -261,6 +262,8 @@
       document.querySelector('#tabbar [data-p="money"]').hidden = !r.me.admin;
       document.querySelector('#tabbar [data-p="bill"]').hidden = !r.me.owner;
       document.getElementById('guideLink').hidden = !r.me.admin;
+    document.getElementById('cmsgBox').hidden = !r.me.owner;
+    if (r.me.owner && document.activeElement !== document.getElementById('cmsgT')) { document.getElementById('cmsgT').value = r.classMsg ? r.classMsg.text : ''; document.getElementById('cmsgAt').textContent = r.classMsg ? r.classMsg.at + ' 更新' : ''; }
       if (!document.querySelector('.panel.on')) showPanel('week');
       renderWeek(); renderEvents(); renderQr(); loadAtt(); loadReq(); loadMeal(); loadMoney();
     }).catch(function(e){
@@ -396,7 +399,7 @@
         D.shifts.filter(function(s){ return s.date === d && s.mentorId === m.id; }).forEach(function(s){ html += '<div class="tlshift" style="' + pos(s.start, s.end) + '"></div>'; });
         lessonsDay.filter(function(l){ return (l.mentorId || '') === m.id; }).forEach(function(l){
           var cancel = l.status !== '予定', warn = !cancel && lessonWarnings(l).length;
-          html += '<button class="tlles' + (l.kind === '講座' ? ' kouza' : '') + (cancel ? ' cancel' : '') + (warn ? ' warnb' : '') + '" data-lesson="' + l.id + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + (l.title || l.names)) + '">' + l.start + ' ' + esc(l.title || l.names) + '</button>';
+          html += '<button class="tlles' + (l.kind === '講座' ? ' kouza' : '') + (cancel ? ' cancel' : '') + (warn ? ' warnb' : '') + '" data-lesson="' + l.id + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + (l.title || l.names)) + '">' + (l.kind === '講座' ? esc(kshort(l)) : l.start + ' ' + esc(l.title || l.names)) + '</button>';
         });
         if (m.id) evsDay.filter(function(e){ return e.mentorId === m.id; }).forEach(function(e){ html += evBtn(e); });
         html += '</div></div>';
@@ -775,6 +778,18 @@
       return '<div class="att"><b>' + esc(m.name) + '</b>' + st + '</div>';
     }).join('');
   }
+
+  function kshort(l){
+    var g = String(l.target || ''), c = String(l.content || '').replace(/\s|講座/g, '');
+    var gm = { '小学生': '小', '高校生': '高', '全学年': '全' };
+    g = gm[g] || g.replace(/[0-9]/g, function(d){ return String.fromCharCode(d.charCodeAt(0) + 0xFEE0); });
+    return (g || c) ? g + (c ? c.charAt(0) : '講') : (l.title || '講座');
+  }
+  document.getElementById('cmsgSave').onclick = function(){
+    var b = this, t = val('cmsgT'); b.disabled = true;
+    api('sch_classmsg_save', { text: t }).then(function(){ toast(t ? 'メッセージを載せました' : 'メッセージを消しました'); return load(); })
+      .catch(function(e){ toast(e.message); }).then(function(){ b.disabled = false; });
+  };
 
   // ===== QRの打ち忘れ =====
   var ATT = null;

@@ -77,6 +77,13 @@
   .reply{display:flex;gap:6px;margin-top:8px;align-items:stretch}
   .reply textarea{flex:1;min-height:44px;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:16px;background:#fff;resize:vertical}
   .reply button{border:0;border-radius:10px;background:var(--ink);color:#fff;font:inherit;font-weight:900;padding:0 16px;cursor:pointer}
+.cmsg{margin-top:8px;background:#fff;border-radius:10px;padding:8px 12px;font-weight:700;white-space:pre-wrap;line-height:1.5}
+.cmsg small{display:block;font-size:11px;color:var(--sub);font-weight:700}
+.kz{margin-top:10px;padding-top:8px;border-top:1px dashed rgba(0,0,0,.18)}
+.kzt{font-weight:900;font-size:14px}
+.kzl{font-weight:700;margin-top:2px}
+.kzm{font-variant-numeric:tabular-nums;margin-right:8px}
+.kzl small{color:var(--sub);font-weight:500}
 </style>
 </head>
 <body>
@@ -208,11 +215,22 @@
     }
   });
 
-  function renderNow(n){
+  function kshort(l){
+  var g = String(l.target || ''), c = String(l.content || '').replace(/\s|講座/g, '');
+  var gm = { '小学生': '小', '高校生': '高', '全学年': '全' };
+  g = gm[g] || g.replace(/[0-9]/g, function(d){ return String.fromCharCode(d.charCodeAt(0) + 0xFEE0); });
+  return (g || c) ? g + (c ? c.charAt(0) : '講') : (l.title || '講座');
+}
+function nowMsg(n){ return n.msg && n.msg.text ? '<div class="cmsg"><small>教室から</small>' + esc(n.msg.text) + '</div>' : ''; }
+function nowKouza(n){
+  if (!n.kouza || !n.kouza.length) return '';
+  return '<div class="kz"><div class="kzt">今日の講座</div>' + n.kouza.map(function(k){ return '<div class="kzl"><span class="kzm">' + k.start + '〜' + k.end + '</span>' + esc(k.name) + (k.mentor ? '<small>（' + esc(k.mentor) + '）</small>' : '') + '</div>'; }).join('') + '</div>';
+}
+function renderNow(n){
     var el = document.getElementById('now'); if (!el || !n) return;
-    el.innerHTML = '<div class="nowt">いまの教室<small>' + esc(n.at) + ' 現在</small></div>'
+    el.innerHTML = '<div class="nowt">いまの教室<small>' + esc(n.at) + ' 現在</small></div>' + nowMsg(n)
       + '<div class="nowr"><span class="big">' + n.students + '</span>人が在室中</div>'
-      + '<div class="nowm">' + n.mentors.map(function(m){ return '<span class="mt' + (m.in ? ' on' : '') + '">' + esc(m.name) + (m.in ? '　出勤中' : '　不在') + '</span>'; }).join('') + '</div>';
+      + '<div class="nowm">' + n.mentors.map(function(m){ return '<span class="mt' + (m.in ? ' on' : '') + '">' + esc(m.name) + (m.in ? '　出勤中' : '　不在') + '</span>'; }).join('') + '</div>' + nowKouza(n);
   }
   function load(){
     return api('req_load').then(function(r){
