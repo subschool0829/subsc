@@ -235,7 +235,7 @@
   var STATUS = ['予定','キャンセル（24時間以内）','キャンセル（連絡なし）','取消'];
   var KEY = (location.hash.match(/m=([0-9a-f]+)/) || [])[1] || '';
   try {
-    if (KEY) { localStorage.setItem('subsc_mkey', KEY); history.replaceState(null, '', location.pathname); }
+    if (KEY) { localStorage.setItem('subsc_mkey', KEY); /* ホーム画面に追加したときも開けるよう、URLの鍵は消さない */ }
     else KEY = localStorage.getItem('subsc_mkey') || '';
   } catch(e){}
 
