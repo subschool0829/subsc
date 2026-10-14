@@ -704,7 +704,7 @@
     var list = D.students.filter(function(s){ return picked.indexOf(s.id) < 0 && (!q || s.name.replace(/\s/g, '').indexOf(q) >= 0); });
     var el = document.getElementById('lPick');
     if (lKind === '個別' && picked.length >= 4) { el.innerHTML = '<div class="none">4人選択済みです</div>'; return; }
-    el.innerHTML = list.length ? list.slice(0, 60).map(function(s){ return '<button type="button" data-sid="' + s.id + '">' + esc(s.name) + '</button>'; }).join('') : '<div class="none">該当する生徒がいません</div>';
+    el.innerHTML = list.length ? list.map(function(s){ return '<button type="button" data-sid="' + s.id + '">' + esc(s.name) + '</button>'; }).join('') : '<div class="none">該当する生徒がいません</div>';
   }
   function refreshLesson(id){
     document.getElementById('lChips').innerHTML = picked.map(function(sid){ return '<span class="chip">' + esc(studentName(sid)) + '<button type="button" data-rm="' + sid + '" aria-label="外す">×</button></span>'; }).join('');
@@ -816,11 +816,12 @@
     var P = PAYD, pd = P.payDay.split('-');
     var line = function(a, b, sub, neg){ return '<div class="att"><div><b>' + a + '</b>' + (sub ? '<div class="muted" style="font-size:12px">' + sub + '</div>' : '') + '</div><b style="white-space:nowrap' + (neg ? ';color:var(--warn)' : '') + '">' + b + '</b></div>'; };
     var h = '<div class="card"><p class="muted">' + esc(P.monthLabel) + 'の請求で計算 ／ 支払日 ' + (+pd[1]) + '月' + (+pd[2]) + '日' + (P.paid ? '　<span class="tag" style="background:#0F6E56;color:#fff">支払済み ' + esc(P.paidOn) + '</span>' : '') + '</p>'
-      + line('教室サポート費用', yen(P.support), '月額利用料（入金済み）' + yen(P.fee.paid) + ' − ' + yen(P.rule.base) + ' の ' + Math.round(P.rule.support * 100) + '%<br>入金済み ' + P.fee.paidCount + '/' + P.fee.count + '件（月額利用料の請求額の合計 ' + yen(P.fee.all) + '）')
+      + line('教室サポート費用', yen(P.support), '月額利用料−割引（入金済み）' + yen(P.fee.paid) + ' − ' + yen(P.rule.base) + ' の ' + Math.round(P.rule.support * 100) + '%<br>入金済み ' + P.fee.paidCount + '/' + P.fee.count + '件（月額利用料−割引の請求額の合計 ' + yen(P.fee.all) + '）')
       + line('個別授業（Kento）', yen(P.lessons.total), (P.lessons.manual != null ? '手入力' : '授業の記録から自動計算') + '・授業の対象期間 ' + esc(P.period) + '・有料講座を含む')
       + line('教室使用料（控除）', '−' + yen(P.room), '個別授業の ' + Math.round(P.rule.room * 100) + '%', true)
       + line('無料講座（Kento）', yen(P.eng.yen), P.eng.count + '回 × ' + yen(P.rule.eng) + (P.eng.manual != null ? '（回数は手入力）' : ''))
       + '<div class="att" style="border-top:2px solid var(--ink);margin-top:4px"><b style="font-size:17px">お支払い額</b><b style="font-size:20px">' + yen(P.total) + '</b></div></div>';
+    h += '<div style="text-align:right;margin:-2px 0 10px"><button class="btn yel" id="pyPrint">支払い書を印刷</button></div>';
     h += '<div class="card"><h2 style="font-size:16px">手入力・支払いの記録</h2>'
       + '<label class="f">個別授業（Kento）の合計額<input type="number" id="pyL" step="100" inputmode="numeric" placeholder="空欄なら自動計算（' + yen(P.lessons.auto) + '）" value="' + (P.lessons.manual != null ? P.lessons.manual : '') + '"></label>'
       + '<label class="f">無料講座の回数<input type="number" id="pyE" min="0" inputmode="numeric" placeholder="空欄なら自動（' + P.eng.auto + '回）" value="' + (P.eng.manual != null ? P.eng.manual : '') + '"></label>'
@@ -833,11 +834,43 @@
       + (P.lessons.unknown ? '<p class="muted" style="color:var(--warn)">学年が分からず計算できなかった生徒が ' + P.lessons.unknown + '人分あります</p>' : '')
       + (P.eng.list.length ? '<p style="margin-top:8px;font-weight:700">無料講座</p>' + P.eng.list.map(function(x){ return '<div class="muted">' + esc(x) + '</div>'; }).join('') : '') + '</div>';
     document.getElementById('pyBox').innerHTML = h;
+    document.getElementById('pyPrint').onclick = payPrint;
     document.getElementById('pySave').onclick = function(){
       var b = this; b.disabled = true;
       api('sch_pay_save', { month: payMonth, lessonsManual: val('pyL'), engManual: val('pyE'), memo: val('pyM'), paid: document.getElementById('pyP').checked, paidOn: val('pyD') })
         .then(function(){ toast('保存しました'); return loadPay(); }).catch(function(e){ toast(e.message); b.disabled = false; });
     };
+  }
+  // 支払い書（Kentoに渡す紙。教室サポート費用の計算内訳は載せない）
+  function payPrint(){
+    var P = PAYD;
+    var jd = function(d){ var p = String(d).split('-'); return (+p[0]) + '年' + (+p[1]) + '月' + (+p[2]) + '日'; };
+    var row = function(a, b, sub){ return '<tr><td>' + a + (sub ? '<small>' + sub + '</small>' : '') + '</td><td class="r">' + b + '</td></tr>'; };
+    var css = '@page{size:A4;margin:16mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;color:#1A1A1A;font-size:10.5pt;line-height:1.6}'
+      + '.brand{font-size:10pt;font-weight:900;color:#5E5E5E}h1{font-size:22pt;font-weight:900;border-bottom:1.6mm solid #F7CE2E;padding-bottom:3mm;margin-top:1mm}'
+      + '.hd{display:flex;justify-content:space-between;align-items:flex-end;margin-top:6mm}.to{font-size:15pt;font-weight:900;border-bottom:.4mm solid #1A1A1A;min-width:70mm;padding-bottom:1mm}.meta{text-align:right;font-size:9.5pt;color:#5E5E5E}'
+      + '.tot{margin-top:6mm;background:#FFF5CC;border-radius:4mm;padding:4mm 6mm;display:flex;justify-content:space-between;align-items:baseline}.tot b{font-size:22pt;font-weight:900}'
+      + 'table{width:100%;border-collapse:collapse;margin-top:5mm}td{padding:2.5mm 1mm;border-bottom:.2mm solid #D9D5C8;vertical-align:top}td small{display:block;font-size:8pt;color:#5E5E5E}.r{text-align:right;white-space:nowrap;font-weight:700}'
+      + 'tr.sum td{border-bottom:0;border-top:.5mm solid #1A1A1A;font-weight:900;font-size:12pt}h3{font-size:11pt;font-weight:900;margin-top:7mm}table.d td{font-size:9pt;padding:1.5mm 1mm}'
+      + '.iss{margin-top:10mm;text-align:right;font-size:9pt;color:#5E5E5E;line-height:1.7}.iss b{color:#1A1A1A;font-size:10.5pt}';
+    var dl = function(d){ return '<tr><td style="width:16mm">' + esc(d.date.slice(5).replace('-', '/')) + '</td><td>' + esc(d.text) + '</td><td class="r">' + yen(d.yen) + '</td></tr>'; };
+    var html = '<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>支払明細書 ' + esc(P.monthLabel) + '</title>'
+      + '<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet"><style>' + css + '</style></head><body>'
+      + '<div class="brand">みんなのサブスク</div><h1>支払明細書</h1>'
+      + '<div class="hd"><div class="to">Kento 様</div><div class="meta">' + esc(P.monthLabel) + '<br>お支払い日 ' + jd(P.paidOn || P.payDay) + '</div></div>'
+      + '<div class="tot"><span>お支払い額</span><b>' + yen(P.total) + '</b></div>'
+      + '<table>' + row('教室サポート費用', yen(P.support))
+      + row('個別授業（有料講座を含む）', yen(P.lessons.total), '授業の対象期間 ' + esc(P.period))
+      + row('教室使用料（控除）', '−' + yen(P.room), '個別授業の' + Math.round(P.rule.room * 100) + '%')
+      + row('無料講座', yen(P.eng.yen), P.eng.count + '回 × ' + yen(P.rule.eng))
+      + '<tr class="sum"><td>お支払い額</td><td class="r">' + yen(P.total) + '</td></tr></table>'
+      + (P.lessons.manual == null && P.lessons.detail.length ? '<h3>個別授業・有料講座の明細</h3><table class="d">' + P.lessons.detail.map(dl).join('') + '</table>' : '')
+      + (P.eng.manual == null && P.eng.list.length ? '<h3>無料講座の明細</h3><table class="d">' + P.eng.list.map(function(x){ return '<tr><td>' + esc(x) + '</td><td class="r">' + yen(P.rule.eng) + '</td></tr>'; }).join('') + '</table>' : '')
+      + '<div class="iss"><b>みんなのサブスク</b>　代表　今本 誠和<br>〒929-1125 石川県かほく市宇野気ト62-1 江川ビル2階</div>'
+      + '<script>setTimeout(function(){ window.print(); }, 800);<\/script></body></html>';
+    var w = window.open('', '_blank');
+    if (!w) { toast('ポップアップを許可してください'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   }
   document.getElementById('pyPrev').onclick = function(){ payMonth = ymNext(payMonth, -1); loadPay(); };
   document.getElementById('pyNext').onclick = function(){ payMonth = ymNext(payMonth, 1); loadPay(); };
