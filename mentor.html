@@ -201,6 +201,14 @@
 <div id="pyBox"><div class="loading">読み込み中…</div></div>
 </section>
 
+<section class="panel" id="p-mem">
+<div class="row"><h2>在籍生徒</h2><span class="muted" id="mmCnt"></span></div>
+<p class="muted" style="margin-bottom:8px;font-size:12px">生徒を押すと、会員の種別を「○月から」切り替えられます。切り替えは、その月の請求の下書きから反映されます。</p>
+<input type="search" id="mmQ" placeholder="名前で探す" style="display:block;width:100%;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:16px;margin-bottom:6px">
+<div class="seg" id="mmF"><button data-k="" aria-pressed="true">すべて</button><button data-k="会員">会員</button><button data-k="エリア外">エリア外</button><button data-k="ビジター">ビジター</button></div>
+<div id="mmList" style="margin-top:10px"><div class="loading">読み込み中…</div></div>
+</section>
+
 <section class="panel" id="p-qr">
     <div class="card">
       <h2>出勤QR</h2>
@@ -229,6 +237,7 @@
   <button data-p="money" hidden>支払い</button>
   <button data-p="bill" hidden>請求</button>
 <button data-p="pay" hidden>Kento</button>
+<button data-p="mem" hidden>名簿</button>
   <button data-p="qr">出勤QR</button>
 </nav>
 
@@ -269,6 +278,7 @@
       document.querySelector('#tabbar [data-p="money"]').hidden = !r.me.admin;
       document.querySelector('#tabbar [data-p="bill"]').hidden = !r.me.admin;
     document.querySelector('#tabbar [data-p="pay"]').hidden = !r.me.owner;
+      document.querySelector('#tabbar [data-p="mem"]').hidden = !r.me.owner;
       document.getElementById('guideLink').hidden = !r.me.admin;
     document.getElementById('cmsgBox').hidden = !r.me.owner;
     if (r.me.owner && document.activeElement !== document.getElementById('cmsgT')) { document.getElementById('cmsgT').value = r.classMsg ? r.classMsg.text : ''; document.getElementById('cmsgAt').textContent = r.classMsg ? r.classMsg.at + ' 更新' : ''; }
@@ -875,6 +885,71 @@
   document.getElementById('pyPrev').onclick = function(){ payMonth = ymNext(payMonth, -1); loadPay(); };
   document.getElementById('pyNext').onclick = function(){ payMonth = ymNext(payMonth, 1); loadPay(); };
 
+  // ===== 在籍生徒（名簿・オーナーのみ） =====
+  var MEMD = null, mmFilter = '';
+  var MMC = { '会員': '#0F6E56', 'エリア外': '#2E6DB4', 'ビジター': '#B85C00', '未設定': '#888' };
+  function mlabel(ym){ var p = String(ym).split('-'); return (+p[0]) + '年' + (+p[1]) + '月'; }
+  function mshort(k){ k = String(k || ''); return /エリア外/.test(k) ? 'エリア外' : /ビジター|非会員/.test(k) ? 'ビジター' : /会員/.test(k) ? '会員' : '未設定'; }
+  function mtag(k){ return '<span class="tag" style="margin-left:0;background:' + (MMC[k] || '#888') + ';color:#fff">' + esc(k) + '</span>'; }
+  function loadMem(){
+    return api('sch_mem_list', {}).then(function(r){ MEMD = r; renderMem(); })
+      .catch(function(e){ document.getElementById('mmList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  function renderMem(){
+    if (!MEMD) return;
+    var S = MEMD.students || [], cnt = { '会員': 0, 'エリア外': 0, 'ビジター': 0, '未設定': 0 };
+    S.forEach(function(s){ cnt[s.kind] = (cnt[s.kind] || 0) + 1; });
+    document.getElementById('mmCnt').textContent = S.length + '人（会員 ' + cnt['会員'] + '・エリア外 ' + cnt['エリア外'] + '・ビジター ' + cnt['ビジター'] + (cnt['未設定'] ? '・未設定 ' + cnt['未設定'] : '') + '）';
+    var q = val('mmQ').replace(/\s/g, '');
+    var L = S.filter(function(s){ return (!mmFilter || s.kind === mmFilter) && (!q || String(s.name).replace(/\s/g, '').indexOf(q) >= 0); });
+    document.getElementById('mmList').innerHTML = L.length ? L.map(function(s){
+      var pend = (s.pending || []).map(function(p){ return '<div class="muted" style="font-size:12px;color:var(--warn)">' + mlabel(p.from) + 'から ' + esc(mshort(p.kind || p.to)) + ' に変更予定</div>'; }).join('');
+      return '<div class="card" data-sid="' + esc(s.id) + '" style="cursor:pointer;padding:10px 14px;margin-bottom:6px"><div class="row"><div style="display:flex;align-items:center;gap:8px;min-width:0">' + mtag(s.kind) + '<b>' + esc(s.name) + '</b></div><span class="muted" style="white-space:nowrap">' + esc(s.grade || '') + '</span></div>' + pend + '</div>';
+    }).join('') : '<div class="card muted">該当する生徒はいません</div>';
+  }
+  document.getElementById('mmQ').addEventListener('input', renderMem);
+  document.getElementById('mmF').addEventListener('click', function(ev){
+    var b = ev.target.closest('button'); if (!b) return;
+    mmFilter = b.getAttribute('data-k');
+    Array.prototype.forEach.call(this.querySelectorAll('button'), function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    renderMem();
+  });
+  document.getElementById('mmList').addEventListener('click', function(ev){
+    var c = ev.target.closest('[data-sid]'); if (!c || !MEMD) return;
+    var sid = c.getAttribute('data-sid');
+    var s = (MEMD.students || []).filter(function(x){ return x.id === sid; })[0];
+    if (s) memForm(s);
+  });
+  function memForm(s){
+    var pend = (s.pending || []).map(function(p){ return '<div class="att"><span>' + mlabel(p.from) + 'から ' + esc(mshort(p.kind || p.to)) + (p.fee !== '' && p.fee != null ? '（月額 ' + esc(p.fee) + '円）' : '') + '</span><button class="btn danger" data-cancel="' + esc(p.from) + '">取消</button></div>'; }).join('');
+    var opts = (MEMD.kinds || []).map(function(k){ return '<option value="' + esc(k) + '"' + (k === s.kindRaw ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('');
+    openModal('<h2>' + esc(s.name) + '</h2>'
+      + '<p class="muted">' + esc(s.grade || '') + '　現在：' + mtag(s.kind) + (s.fee !== '' && s.fee != null ? '　月額 ' + esc(s.fee) + '円' : '') + '</p>'
+      + (pend ? '<p style="font-weight:700;margin-top:10px">変更の予定</p>' + pend : '')
+      + '<p style="font-weight:700;margin-top:12px">会員の種別を切り替える</p>'
+      + '<label class="f">切り替え後の種別<select id="mmK">' + opts + '</select></label>'
+      + '<label class="f">いつから<input type="month" id="mmM" value="' + ymNext(MEMD.month, 1) + '" min="' + esc(MEMD.month) + '"></label>'
+      + '<label class="f">月額（円・変える場合だけ）<input type="number" id="mmFee" step="100" inputmode="numeric" placeholder="空欄なら今の月額のまま（ビジターは0円）"></label>'
+      + '<p class="muted" style="font-size:12px">今月を選ぶとすぐ名簿に反映します。来月以降は、その月の1日に自動で反映します（請求の下書きはその月から新しい種別で作ります）。</p>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="mmOk">変更する</button></div></div>');
+    Array.prototype.forEach.call(document.querySelectorAll('#sheet [data-cancel]'), function(b){
+      b.onclick = function(){
+        b.disabled = true;
+        api('sch_mem_cancel', { sid: s.id, from: b.getAttribute('data-cancel') })
+          .then(function(){ closeModal(); toast('予定を取り消しました'); return loadMem(); })
+          .catch(function(e){ toast(e.message); b.disabled = false; });
+      };
+    });
+    document.getElementById('mmOk').onclick = function(){
+      var b = this, from = val('mmM');
+      if (!/^\d{4}-\d{2}$/.test(from)) { toast('いつからを選んでください'); return; }
+      b.disabled = true;
+      api('sch_mem_change', { sid: s.id, kind: val('mmK'), from: from, fee: val('mmFee') })
+        .then(function(r){ closeModal(); toast(r && r.applied ? '名簿に反映しました' : mlabel(from) + 'からの変更を予約しました'); return loadMem(); })
+        .catch(function(e){ toast(e.message); b.disabled = false; });
+    };
+  }
+
   // ===== QRの打ち忘れ =====
   var ATT = null;
   function loadAtt(){
@@ -1129,7 +1204,7 @@
     api('sch_money_visit_load').then(function(r){ VIS = r; renderVisit(); })
       .catch(function(e){ document.getElementById('vList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
     if (D.me.admin) loadBill();
-    if (D.me.owner) loadPay();
+    if (D.me.owner) { loadPay(); loadMem(); }
   }
   function renderVisit(){
     document.getElementById('vSum').textContent = '未払い ' + VIS.unpaid + '件';
