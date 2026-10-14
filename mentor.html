@@ -196,7 +196,12 @@
     <div id="bList"><div class="loading">読み込み中…</div></div>
   </section>
 
-  <section class="panel" id="p-qr">
+  <section class="panel" id="p-pay">
+<div class="row"><h2>Kentoへの支払い</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn" id="pyPrev" aria-label="前の月">◀</button><b id="pyMonth"></b><button class="btn" id="pyNext" aria-label="次の月">▶</button></div></div>
+<div id="pyBox"><div class="loading">読み込み中…</div></div>
+</section>
+
+<section class="panel" id="p-qr">
     <div class="card">
       <h2>出勤QR</h2>
       <p class="muted">教室のタブレットにかざすと、出勤・退勤が記録されます。画面を明るくしてかざしてください。印刷してカードにしてもOKです。</p>
@@ -223,6 +228,7 @@
   <button data-p="meal">食事</button>
   <button data-p="money" hidden>支払い</button>
   <button data-p="bill" hidden>請求</button>
+<button data-p="pay" hidden>Kento</button>
   <button data-p="qr">出勤QR</button>
 </nav>
 
@@ -262,6 +268,7 @@
       document.getElementById('meName').textContent = r.me.name + 'さん' + (r.me.admin ? '（管理者）' : '');
       document.querySelector('#tabbar [data-p="money"]').hidden = !r.me.admin;
       document.querySelector('#tabbar [data-p="bill"]').hidden = !r.me.admin;
+    document.querySelector('#tabbar [data-p="pay"]').hidden = !r.me.owner;
       document.getElementById('guideLink').hidden = !r.me.admin;
     document.getElementById('cmsgBox').hidden = !r.me.owner;
     if (r.me.owner && document.activeElement !== document.getElementById('cmsgT')) { document.getElementById('cmsgT').value = r.classMsg ? r.classMsg.text : ''; document.getElementById('cmsgAt').textContent = r.classMsg ? r.classMsg.at + ' 更新' : ''; }
@@ -792,6 +799,45 @@
       .catch(function(e){ toast(e.message); }).then(function(){ b.disabled = false; });
   };
 
+  // ===== Kentoへの支払い（オーナーのみ） =====
+  var PAYD = null, payMonth = null;
+  function loadPay(){
+    if (!payMonth) payMonth = ymNext(D.today.slice(0, 7), 1);
+    var p = payMonth.split('-');
+    document.getElementById('pyMonth').textContent = (+p[0]) + '年' + (+p[1]) + '月分';
+    return api('sch_pay_load', { month: payMonth }).then(function(r){ PAYD = r; renderPay(); })
+      .catch(function(e){ document.getElementById('pyBox').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  function renderPay(){
+    var P = PAYD, pd = P.payDay.split('-');
+    var line = function(a, b, sub, neg){ return '<div class="att"><div><b>' + a + '</b>' + (sub ? '<div class="muted" style="font-size:12px">' + sub + '</div>' : '') + '</div><b style="white-space:nowrap' + (neg ? ';color:var(--warn)' : '') + '">' + b + '</b></div>'; };
+    var h = '<div class="card"><p class="muted">' + esc(P.monthLabel) + 'の請求で計算 ／ 支払日 ' + (+pd[1]) + '月' + (+pd[2]) + '日' + (P.paid ? '　<span class="tag" style="background:#0F6E56;color:#fff">支払済み ' + esc(P.paidOn) + '</span>' : '') + '</p>'
+      + line('教室サポート費用', yen(P.support), '月額利用料（入金済み）' + yen(P.fee.paid) + ' − ' + yen(P.rule.base) + ' の ' + Math.round(P.rule.support * 100) + '%<br>入金済み ' + P.fee.paidCount + '/' + P.fee.count + '件（月額利用料の請求額の合計 ' + yen(P.fee.all) + '）')
+      + line('個別授業（Kento）', yen(P.lessons.total), (P.lessons.manual != null ? '手入力' : '授業の記録から自動計算') + '・授業の対象期間 ' + esc(P.period) + '・高校生の講座を含む')
+      + line('教室使用料（控除）', '−' + yen(P.room), '個別授業の ' + Math.round(P.rule.room * 100) + '%', true)
+      + line('中学生の英語講座', yen(P.eng.yen), P.eng.count + '回 × ' + yen(P.rule.eng) + (P.eng.manual != null ? '（回数は手入力）' : ''))
+      + '<div class="att" style="border-top:2px solid var(--ink);margin-top:4px"><b style="font-size:17px">お支払い額</b><b style="font-size:20px">' + yen(P.total) + '</b></div></div>';
+    h += '<div class="card"><h2 style="font-size:16px">手入力・支払いの記録</h2>'
+      + '<label class="f">個別授業（Kento）の合計額<input type="number" id="pyL" step="100" inputmode="numeric" placeholder="空欄なら自動計算（' + yen(P.lessons.auto) + '）" value="' + (P.lessons.manual != null ? P.lessons.manual : '') + '"></label>'
+      + '<label class="f">中学生の英語講座の回数<input type="number" id="pyE" min="0" inputmode="numeric" placeholder="空欄なら自動（' + P.eng.auto + '回）" value="' + (P.eng.manual != null ? P.eng.manual : '') + '"></label>'
+      + '<label class="f">メモ<textarea id="pyM" maxlength="300">' + esc(P.memo) + '</textarea></label>'
+      + '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="pyP" style="width:auto;display:inline"' + (P.paid ? ' checked' : '') + '>支払済み</label>'
+      + '<label class="f">支払日<input type="date" id="pyD" value="' + (P.paidOn || P.payDay) + '"></label>'
+      + '<div class="acts"><div class="r"><button class="btn pri" id="pySave">保存</button></div></div></div>';
+    h += '<div class="card"><h2 style="font-size:16px">計算のもと（授業の記録）</h2>'
+      + (P.lessons.detail.length ? P.lessons.detail.map(function(d){ return '<div class="att"><span>' + esc(d.date.slice(5).replace('-', '/')) + ' ' + esc(d.text) + '</span><span>' + yen(d.yen) + '</span></div>'; }).join('') : '<p class="muted">この期間のKentoの授業の記録はありません</p>')
+      + (P.lessons.unknown ? '<p class="muted" style="color:var(--warn)">学年が分からず計算できなかった生徒が ' + P.lessons.unknown + '人分あります</p>' : '')
+      + (P.eng.list.length ? '<p style="margin-top:8px;font-weight:700">中学生の英語講座</p>' + P.eng.list.map(function(x){ return '<div class="muted">' + esc(x) + '</div>'; }).join('') : '') + '</div>';
+    document.getElementById('pyBox').innerHTML = h;
+    document.getElementById('pySave').onclick = function(){
+      var b = this; b.disabled = true;
+      api('sch_pay_save', { month: payMonth, lessonsManual: val('pyL'), engManual: val('pyE'), memo: val('pyM'), paid: document.getElementById('pyP').checked, paidOn: val('pyD') })
+        .then(function(){ toast('保存しました'); return loadPay(); }).catch(function(e){ toast(e.message); b.disabled = false; });
+    };
+  }
+  document.getElementById('pyPrev').onclick = function(){ payMonth = ymNext(payMonth, -1); loadPay(); };
+  document.getElementById('pyNext').onclick = function(){ payMonth = ymNext(payMonth, 1); loadPay(); };
+
   // ===== QRの打ち忘れ =====
   var ATT = null;
   function loadAtt(){
@@ -1046,6 +1092,7 @@
     api('sch_money_visit_load').then(function(r){ VIS = r; renderVisit(); })
       .catch(function(e){ document.getElementById('vList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
     if (D.me.admin) loadBill();
+    if (D.me.owner) loadPay();
   }
   function renderVisit(){
     document.getElementById('vSum').textContent = '未払い ' + VIS.unpaid + '件';
