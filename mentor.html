@@ -191,7 +191,7 @@
   <section class="panel" id="p-bill">
     <div class="row"><h2>請求</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn" id="bPrev" aria-label="前の月">◀</button><b id="bMonth"></b><button class="btn" id="bNext" aria-label="次の月">▶</button></div></div>
     <p class="muted" id="bSum" style="margin:6px 0 10px"></p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="bBuild">下書きを作成</button><button class="btn" id="bConfirm">下書きをすべて確定</button><button class="btn yel" id="bSend">確定分をLINE・メールで送付</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="bBuild">下書きを作成</button><button class="btn" id="bConfirm">下書きをすべて確定</button><button class="btn yel" id="bSend">確定分をLINE・メールで送付</button><button class="btn" id="bPaper">紙の請求書を印刷</button></div>
     <p class="muted" style="margin-bottom:10px;font-size:12px">下書きは、名簿の月額・割引・家族IDと、授業・講座・食事の記録から作ります。家族を押すと、項目と金額を直したり、模試・テキスト代などを追加したりできます。入金の記録もここから付けます。</p>
     <div id="bList"><div class="loading">読み込み中…</div></div>
   </section>
@@ -1143,6 +1143,7 @@
   function billAct(action, data, msg){
     return api(action, Object.assign({ month: billMonth }, data || {})).then(function(r){ if (msg) toast(typeof msg === 'function' ? msg(r) : msg); return loadBill(); }).catch(function(e){ toast(e.message); });
   }
+  document.getElementById('bPaper').onclick = function(){ window.open('billprint.html#' + billMonth, '_blank'); };
   document.getElementById('bPrev').onclick = function(){ billMonth = ymNext(billMonth, -1); loadBill(); };
   document.getElementById('bNext').onclick = function(){ billMonth = ymNext(billMonth, 1); loadBill(); };
   document.getElementById('bBuild').onclick = function(){

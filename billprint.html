@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>紙の請求書｜みんなのサブスク</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{--ink:#1A1A1A;--sub:#5E5E5E;--line:#D9D5C8;--yellow:#F7CE2E;--tint:#FFF5CC;--soft:#F7F6F2;--warn:#B3261E;--ok:#0F6E56}
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;color:var(--ink);background:#E9E7E0;font-weight:500;line-height:1.6}
+  .bar{position:sticky;top:0;z-index:5;background:#fff;border-bottom:4px solid var(--yellow);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+  .bar b{font-weight:900}
+  .bar label{font-size:13px;font-weight:700;color:var(--sub);display:flex;align-items:center;gap:6px}
+  .bar input{font:inherit;padding:4px 8px;border:1.5px solid var(--line);border-radius:8px}
+  .btn{font:inherit;font-weight:900;font-size:14px;background:var(--ink);color:#fff;border:0;border-radius:999px;padding:8px 18px;cursor:pointer}
+  .msg{padding:40px 16px;text-align:center}
+  .page{width:210mm;min-height:297mm;margin:12px auto;background:#fff;padding:16mm 16mm 14mm;position:relative;box-shadow:0 2px 10px rgba(0,0,0,.12);font-size:10.5pt}
+  .draft{position:absolute;top:8mm;right:16mm;color:var(--warn);font-weight:900;font-size:10pt;border:1.5px solid var(--warn);border-radius:6px;padding:0 8px}
+  .brand{font-size:10pt;font-weight:900;color:var(--sub)}
+  h1{font-size:22pt;font-weight:900;line-height:1.25;padding-bottom:3mm;border-bottom:1.6mm solid var(--yellow);margin-top:1mm}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;margin-top:6mm;gap:8mm}
+  .to{font-size:15pt;font-weight:900;border-bottom:.4mm solid var(--ink);padding-bottom:1mm;min-width:90mm}
+  .meta{font-size:9pt;color:var(--sub);text-align:right;line-height:1.7}
+  .total{margin-top:6mm;background:var(--tint);border-radius:4mm;padding:4mm 6mm;display:flex;justify-content:space-between;align-items:baseline}
+  .total b{font-size:22pt;font-weight:900;font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse;margin-top:5mm;font-size:10pt}
+  th{text-align:left;font-size:8.5pt;color:var(--sub);font-weight:700;border-bottom:.4mm solid var(--ink);padding:1.5mm 1mm}
+  td{padding:2mm 1mm;border-bottom:.2mm solid var(--line);vertical-align:top}
+  td.r,th.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  td small{display:block;color:var(--sub);font-size:7.5pt;line-height:1.4}
+  tr.sum td{border-bottom:0;font-weight:900;font-size:11.5pt}
+  .due{margin-top:6mm;border:.6mm solid var(--ink);border-radius:3mm;padding:3mm 5mm;font-size:12pt;font-weight:900}
+  .due span{color:var(--warn)}
+  .pay{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:4mm}
+  .pay > div{border:.3mm solid var(--line);border-radius:3mm;padding:3mm 4mm;font-size:9.5pt}
+  .pay h3{font-size:11pt;font-weight:900;margin-bottom:1.5mm}
+  .pay .bk{font-size:10pt;line-height:1.7}
+  .pay .bk b{font-weight:900}
+  .note{font-size:8.5pt;color:var(--sub);margin-top:4mm;line-height:1.6}
+  .iss{position:absolute;left:16mm;right:16mm;bottom:14mm;display:flex;justify-content:space-between;align-items:flex-end;font-size:8.5pt;color:var(--sub);line-height:1.6;border-top:.2mm solid var(--line);padding-top:3mm}
+  .iss b{color:var(--ink);font-size:10pt}
+  .qrs{display:flex;align-items:center;gap:3mm;text-align:right}
+  .qrs .q{width:20mm;height:20mm}
+  .q img,.q canvas{width:100%!important;height:100%!important;display:block}
+  h2{font-size:17pt;font-weight:900;line-height:1.35;padding-bottom:3mm;border-bottom:1.6mm solid var(--yellow);margin-top:1mm}
+  .lead{margin-top:4mm;font-size:10.5pt;line-height:1.8}
+  .st{margin-top:4mm}
+  .st td,.st th{font-size:10pt}
+  .ok{color:var(--ok);font-weight:900}
+  .ng{color:var(--warn);font-weight:900}
+  .code{font-family:ui-monospace,Menlo,monospace;font-weight:900;font-size:12pt;letter-spacing:.08em}
+  .step{display:flex;gap:6mm;align-items:center;margin-top:5mm;border:.4mm solid var(--line);border-radius:4mm;padding:4mm 5mm}
+  .step .q{width:30mm;height:30mm;flex:none}
+  .step h3{font-size:12.5pt;font-weight:900;margin-bottom:1mm}
+  .step h3 i{font-style:normal;display:inline-block;background:var(--ink);color:#fff;border-radius:50%;width:6.5mm;height:6.5mm;text-align:center;line-height:6.5mm;font-size:10pt;margin-right:2mm;vertical-align:1px}
+  .step p{font-size:9.5pt;line-height:1.7}
+  .step .codes{margin-top:1.5mm;font-size:10pt}
+  .done{margin-top:6mm;background:var(--tint);border-radius:4mm;padding:5mm 6mm;font-size:11pt;font-weight:700;line-height:1.8}
+  @media print{
+    @page{size:A4;margin:0}
+    body{background:#fff}
+    .bar,.msg{display:none!important}
+    .page{margin:0;box-shadow:none;break-after:page;height:297mm;overflow:hidden}
+    .page:last-child{break-after:auto}
+  }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b id="ttl">紙の請求書</b>
+  <label>発行日 <input type="date" id="issue"></label>
+  <label><input type="checkbox" id="showDraft">下書きも表示（確認用）</label>
+  <span id="cnt" style="font-size:13px;color:var(--sub)"></span>
+  <button class="btn" onclick="window.print()">印刷する</button>
+</div>
+<div class="msg" id="boot">読み込み中…</div>
+<div id="pages"></div>
+
+<script>
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbwoPiOpPmUcykIrgUGYj5f0z1jnPA6gH3cU2aUDsqSLVKlAB9CytbtpYb8iqHAS81kQ-g/exec';
+  var FORM_URL = 'https://forms.gle/5XpmWff4jCFtaGeZ6';
+  var LINE_URL = 'https://lin.ee/UcXLGVg';
+  var INVOICE_URL = 'https://subschool0829.github.io/subsc/invoice.html#t=';
+  var KEY = ''; try { KEY = localStorage.getItem('subsc_mkey') || ''; } catch(e){}
+  var MONTH = (location.hash.match(/(\d{4}-\d{2})/) || [])[1] || '';
+  var R = null;
+  var WD = ['日','月','火','水','木','金','土'];
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function yen(n){ return (n < 0 ? '−' : '') + Math.abs(n).toLocaleString('ja-JP') + '円'; }
+  function jd(d, wd){ var p = String(d || '').split('-'); if (p.length !== 3) return ''; var s = (+p[0]) + '年' + (+p[1]) + '月' + (+p[2]) + '日'; if (wd) s += '（' + WD[new Date(+p[0], p[1] - 1, +p[2]).getDay()] + '）'; return s; }
+  function qr(el, text){ try { new QRCode(el, { text: text, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M }); } catch(e){} }
+  function today(){ var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+
+  function invoicePage(b){
+    var first = b.students[0] || {};
+    var kana = '（例：' + esc(first.id || 'S000') + ' ' + '○○○○）';
+    var rows = b.items.map(function(i){ return '<tr><td>' + esc(i.label) + (i.note ? '<small>' + esc(i.note) + '</small>' : '') + '</td><td class="r">' + yen(i.amount) + '</td></tr>'; }).join('');
+    return '<section class="page">' + (b.status === '下書き' ? '<div class="draft">下書き（未確定）</div>' : '')
+      + '<div class="brand">みんなのサブスク</div><h1>' + esc(R.monthLabel) + ' ご請求書</h1>'
+      + '<div class="head"><div class="to">' + esc(b.to) + '</div><div class="meta">請求番号 ' + esc(b.id) + '<br>発行日 ' + jd(document.getElementById('issue').value) + '</div></div>'
+      + '<div class="total"><span>ご請求金額（税込）</span><b>' + yen(b.total) + '</b></div>'
+      + '<table><tr><th>内容</th><th class="r">金額</th></tr>' + rows + '<tr class="sum"><td>合計</td><td class="r">' + yen(b.total) + '</td></tr></table>'
+      + '<div class="due">お支払い期限　<span>' + jd(R.due, true) + '</span>まで</div>'
+      + '<div class="pay"><div><h3>現金でお支払いの方</h3>この封筒に代金を入れて、教室のメンターにお渡しください。おつりのないようにご用意いただけると助かります。</div>'
+      + '<div><h3>お振込みの方</h3><div class="bk">' + esc(R.bank.bank) + '（' + esc(R.bank.bankCode) + '）' + esc(R.bank.branch) + '（' + esc(R.bank.branchCode) + '）<br>' + esc(R.bank.type) + '　<b>' + esc(R.bank.number) + '</b><br>口座名義　<b>' + esc(R.bank.holder) + '</b></div>'
+      + '<div style="font-size:8.5pt;color:var(--sub);margin-top:1mm">振込名義は「会員番号＋お名前」でお願いします' + kana + '。振込手数料はご負担ください。</div></div></div>'
+      + '<p class="note">ご入金を確認できましたら、教室で記録いたします。領収書が必要な方は、裏面の公式LINEのご登録後、オンライン請求書からダウンロード・印刷できます（紙の領収書が必要な方はお申し出ください）。</p>'
+      + '<div class="iss"><div><b>みんなのサブスク</b>　代表　今本 誠和<br>〒929-1125 石川県かほく市宇野気ト62-1 江川ビル2階　電話 090-1638-5444</div>'
+      + (b.token ? '<div class="qrs"><div>スマホで<br>この請求書を見る</div><div class="q" data-qr="' + esc(INVOICE_URL + b.token) + '"></div></div>' : '') + '</div>'
+      + '</section>';
+  }
+
+  function guidePage(b){
+    var ss = b.students;
+    var needForm = ss.filter(function(s){ return s.form !== '済'; });
+    var needLine = ss.filter(function(s){ return s.line !== '済'; });
+    var mark = function(v){ return v === '済' ? '<span class="ok">済</span>' : '<span class="ng">未</span>'; };
+    var h = '<section class="page"><div class="brand">みんなのサブスク</div><h2>オンライン請求書への切り替えと<br>在籍登録のお願い</h2>'
+      + '<p class="lead">いつもありがとうございます。みんなのサブスクでは、請求書・領収書を<b>公式LINEでお届けする仕組み</b>に切り替えます。<b>次回（12月分）からは、紙の請求書はお渡ししません。</b>お支払い状況の確認や領収書の印刷も、スマホからできるようになります。</p>'
+      + '<table class="st"><tr><th>生徒</th><th>在籍登録フォーム</th><th>公式LINEの登録</th><th>登録コード</th></tr>'
+      + ss.map(function(s){ return '<tr><td><b>' + esc(s.name) + '</b> さん</td><td>' + mark(s.form) + '</td><td>' + mark(s.line) + '</td><td class="code">' + esc(s.code) + '</td></tr>'; }).join('') + '</table>';
+    var n = 0;
+    if (needForm.length) {
+      n++;
+      h += '<div class="step"><div class="q" data-qr="' + FORM_URL + '"></div><div><h3><i>' + n + '</i>在籍登録フォームの入力</h3>'
+        + '<p>保護者の方がご入力ください（5分ほどです）。お子さまが複数いる場合は、1人ずつご入力ください。<br><b>「生徒氏名」は、下のとおりの漢字でご入力ください</b>（教室の名簿と照らし合わせます）。</p>'
+        + '<div class="codes">' + needForm.map(function(s){ return '<b>' + esc(s.name) + '</b>'; }).join('、') + '</div>'
+        + '<p style="font-size:8pt;color:var(--sub);margin-top:1mm">' + FORM_URL + '</p></div></div>';
+    }
+    if (needLine.length) {
+      n++;
+      h += '<div class="step"><div class="q" data-qr="' + LINE_URL + '"></div><div><h3><i>' + n + '</i>公式LINEの登録</h3>'
+        + '<p>QRコードから公式LINEを友だち追加し、トーク画面に<b>登録コード（英数字6文字）</b>を送ってください。入退室のお知らせと、請求書がLINEで届くようになります。ご家族それぞれのLINEで登録できます。</p>'
+        + '<div class="codes">' + needLine.map(function(s){ return esc(s.name) + 'さん　<span class="code">' + esc(s.code) + '</span>'; }).join('<br>') + '</div></div></div>';
+    }
+    if (!needForm.length && !needLine.length) {
+      h += '<div class="done">ご登録はすべてお済みです。ありがとうございます。<br>今回の請求書は、公式LINEでも同じものをお送りしています（お支払いは1回で大丈夫です）。次回からは、LINEでのお届けのみになります。</div>';
+    } else if (!needLine.length) {
+      h += '<p class="note" style="font-size:9.5pt">公式LINEはご登録済みのため、今回の請求書はLINEでも同じものをお送りしています（お支払いは1回で大丈夫です）。</p>';
+    }
+    h += '<p class="note" style="font-size:9.5pt">すでにご登録いただいている場合は、行き違いですのでご容赦ください。ご不明な点は、公式LINEまたは今本（090-1638-5444）までお気軽にどうぞ。</p>';
+    return h + '</section>';
+  }
+
+  function render(){
+    if (!R) return;
+    var all = document.getElementById('showDraft').checked;
+    var list = R.list.filter(function(b){ return all || b.status !== '下書き'; });
+    var drafts = R.list.filter(function(b){ return b.status === '下書き'; }).length;
+    document.getElementById('cnt').textContent = list.length + '家庭・' + (list.length * 2) + 'ページ（両面印刷で1家庭1枚）' + (drafts && !all ? '　※下書き ' + drafts + '件は表示していません（先に確定してください）' : '');
+    document.getElementById('pages').innerHTML = list.map(function(b){ return invoicePage(b) + guidePage(b); }).join('');
+    [].forEach.call(document.querySelectorAll('[data-qr]'), function(el){ qr(el, el.dataset.qr); });
+    document.getElementById('boot').hidden = !!list.length;
+    if (!list.length) document.getElementById('boot').textContent = '確定した請求がありません。請求の画面で確定してから開いてください（「下書きも表示」で中身の確認はできます）。';
+  }
+  document.getElementById('issue').value = today();
+  document.getElementById('issue').onchange = render;
+  document.getElementById('showDraft').onchange = render;
+
+  if (!KEY || !MONTH) {
+    document.getElementById('boot').textContent = 'メンターページの「請求」から開いてください。';
+  } else {
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'sch_bill_paper', mkey: KEY, month: MONTH }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        if (!r.ok) throw new Error(r.message);
+        R = r;
+        document.getElementById('ttl').textContent = '紙の請求書　' + r.monthLabel;
+        document.title = r.monthLabel + ' 紙の請求書｜みんなのサブスク';
+        render();
+      })
+      .catch(function(e){ document.getElementById('boot').textContent = e.message || '読み込めませんでした'; });
+  }
+</script>
+</body>
+</html>
