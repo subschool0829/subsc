@@ -344,7 +344,7 @@
           var cancel = o.status !== '予定';
           var ws = cancel ? [] : lessonWarnings(o);
           html += '<button class="item lesson' + (o.kind === '講座' ? ' kouza' : '') + (cancel ? ' cancel' : '') + '" data-lesson="' + o.id + '"><span class="t">' + o.start + '〜' + o.end + '</span>' + (o.kind === '講座' ? '講座　' : '授業　') + esc(o.title || o.names)
-            + (o.kind === '講座' && o.fee ? '<span class="tag">' + o.fee.toLocaleString() + '円</span>' : '') + (o.count >= 2 ? '<span class="tag">' + o.count + '人</span>' : '') + (cancel ? '<span class="tag">' + esc(o.status) + '</span>' : '')
+            + (o.kind === '講座' ? '<span class="tag">' + (o.ktype === '有料' ? '有料 ' + o.fee.toLocaleString() + '円' : '無料') + '</span>' : '') + (o.count >= 2 ? '<span class="tag">' + o.count + '人</span>' : '') + (cancel ? '<span class="tag">' + esc(o.status) + '</span>' : '')
             + '<small>' + (o.content ? esc(o.content) + '　' : '') + '担当：' + esc(o.mentor || '未定') + '</small>'
             + ws.map(function(x){ return '<span class="warn">⚠ ' + esc(x) + '</span>'; }).join('') + '</button>';
         } else {
@@ -510,7 +510,7 @@
       + '<div class="acts"><div class="r"><button class="btn" id="mvNo">やめる</button><button class="btn pri" id="mvOk" data-label="移動する">移動する</button></div></div>');
     document.getElementById('mvNo').onclick = closeModal;
     document.getElementById('mvOk').onclick = function(){
-      save('sch_lesson_save', { id: l.id, date: nd, start: ns, end: ne, students: l.students, mentorId: nm, content: l.content, status: l.status, memo: l.memo, kind: l.kind, target: l.target, fee: l.fee || 0, notify: !!(document.getElementById('mvNt') && document.getElementById('mvNt').checked) }, '移動しました', this);
+      save('sch_lesson_save', { id: l.id, date: nd, start: ns, end: ne, students: l.students, mentorId: nm, content: l.content, status: l.status, memo: l.memo, kind: l.kind, target: l.target, ktype: l.ktype, fee: l.ktype === '有料' ? l.fee : '', feeNon: l.ktype === '有料' ? l.feeNon : '', notify: !!(document.getElementById('mvNt') && document.getElementById('mvNt').checked) }, '移動しました', this);
     };
   }
   function moveEventConfirm(e, ns, ne, nm){
@@ -622,20 +622,21 @@
   }
 
   // ----- 授業・講座 -----
-  var picked = [], lKind = '個別';
+  var picked = [], lKind = '個別', lKT = '無料';
   var TARGETS = ['小学生','中1','中2','中3','高1','高2','高3','高校生','全学年'];
   function lessonForm(l, d, preset){
     var isNew = !l;
     var ps = (preset && preset.start) || '17:00';
     l = l || { date: d, start: ps, end: addMin(ps, LESSON_MIN), students: [], mentorId: preset ? preset.mentorId : D.me.id, content: '', status: '予定', memo: '', kind: '個別', target: '' };
     lKind = l.kind || '個別';
+    lKT = l.ktype || '無料';
     picked = l.students.slice();
     openModal('<h3>' + (isNew ? '授業・講座を追加' : (lKind === '講座' ? '講座' : '授業')) + '</h3>'
       + (isNew ? '<div class="seg" id="lK" style="margin-bottom:4px"><button type="button" data-v="個別">個別授業</button><button type="button" data-v="講座">講座（集団）</button></div>' : '')
       + '<label class="f">' + (isNew ? '日付（くり返す場合は初回）' : '日付') + '<input type="date" id="lD" value="' + l.date + '"></label>'
       + '<div class="two"><label class="f">開始<input type="time" id="lS" value="' + l.start + '" step="300"></label><label class="f">終了<input type="time" id="lE" value="' + l.end + '" step="300"></label></div>'
       + '<label class="f" id="lGW">対象<select id="lG"><option value="">選ぶ</option>' + TARGETS.map(function(t){ return '<option' + (t === l.target ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></label>'
-      + '<label class="f" id="lFW">参加費（1人あたり・円）<input type="number" id="lF" min="0" step="100" inputmode="numeric" value="' + (l.fee || '') + '" placeholder="無料なら空欄"></label><label class="f"><span id="lQL">生徒（最大4人）</span><input id="lQ" placeholder="名前で検索" autocomplete="off"></label>'
+      + '<div id="lFW"><div class="seg" id="lKT" style="margin-top:12px"><button type="button" data-v="無料">無料講座</button><button type="button" data-v="有料">有料講座</button></div><div class="two" id="lFP"><label class="f">会員の参加費（円）<input type="number" id="lF" min="0" step="100" inputmode="numeric" value="' + (l.ktype === '有料' ? l.fee : 1000) + '"></label><label class="f">非会員の参加費（円）<input type="number" id="lFN" min="0" step="100" inputmode="numeric" value="' + (l.ktype === '有料' ? l.feeNon : 3000) + '"></label></div></div><label class="f"><span id="lQL">生徒（最大4人）</span><input id="lQ" placeholder="名前で検索" autocomplete="off"></label>'
       + '<div class="chips" id="lChips"></div><div class="picker" id="lPick"></div>'
       + '<label class="f">担当<select id="lM"><option value="">未定</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '"' + (m.id === l.mentorId ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>'
       + '<label class="f"><span id="lCL">内容（任意）</span><input id="lC" value="' + esc(l.content) + '" maxlength="60"></label>'
@@ -654,7 +655,9 @@
       [].forEach.call(document.querySelectorAll('#lK button'), function(b){ b.setAttribute('aria-pressed', b.dataset.v === lKind ? 'true' : 'false'); });
       document.getElementById('lGW').style.display = k ? '' : 'none';
     document.getElementById('lFW').style.display = k ? '' : 'none';
-      document.getElementById('lQL').textContent = k ? '参加者（参加費は選んだ人の月謝に加算。参加費が空欄なら会員は無料・非会員は2,000円）' : '生徒（最大4人）';
+    [].forEach.call(document.querySelectorAll('#lKT button'), function(b){ b.setAttribute('aria-pressed', b.dataset.v === lKT ? 'true' : 'false'); });
+    document.getElementById('lFP').style.display = k && lKT === '有料' ? '' : 'none';
+      document.getElementById('lQL').textContent = k ? (lKT === '有料' ? '参加者（選んだ人の月謝に参加費を加算します）' : '参加者（会員は無料・ビジターは2,000円）') : '生徒（最大4人）';
       document.getElementById('lCL').textContent = k ? '科目・内容（例：数学）' : '内容（任意）';
       document.getElementById('lC').placeholder = k ? '例：数学' : '例：数学　関数';
       refreshLesson(l.id);
@@ -667,12 +670,13 @@
     }
     var startEl = document.getElementById('lS'), endEl = document.getElementById('lE');
     startEl.addEventListener('change', function(){ if (startEl.value) endEl.value = addMin(startEl.value, LESSON_MIN); refreshLesson(l.id); });
-    ['lD','lE','lM','lF'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ refreshLesson(l.id); }); });
+    ['lD','lE','lM','lF','lFN'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ refreshLesson(l.id); }); });
     if (isNew) {
       document.getElementById('lK').onclick = function(ev){ var b = ev.target.closest('button'); if (b) { lKind = b.dataset.v; if (lKind === '個別' && picked.length > 4) picked = picked.slice(0, 4); kindUI(); } };
       document.getElementById('lRp').onchange = repUI;
       ['lD','lU'].forEach(function(id){ document.getElementById(id).addEventListener('change', repUI); });
     }
+    document.getElementById('lKT').onclick = function(ev){ var b = ev.target.closest('button'); if (b) { lKT = b.dataset.v; kindUI(); } };
     document.getElementById('lQ').addEventListener('input', function(){ renderPicker(); });
     document.getElementById('lPick').addEventListener('click', function(ev){
       var b = ev.target.closest('button[data-sid]'); if (!b) return;
@@ -688,7 +692,7 @@
       if (lKind === '講座' && !val('lG')) { toast('講座の対象を選んでください'); return; }
       var dates = isNew && document.getElementById('lRp').checked ? repeatDates(val('lD'), val('lU'), 'weekly') : null;
       var nt = document.getElementById('lNt');
-      save('sch_lesson_save', { id: isNew ? '' : l.id, kind: lKind, target: val('lG'), fee: lKind === '講座' ? (+val('lF') || 0) : 0, date: val('lD'), dates: dates, start: val('lS'), end: val('lE'), students: picked, mentorId: val('lM'), content: val('lC'), status: isNew ? '予定' : val('lT'), memo: val('lN'), notify: !!(nt && nt.checked) },
+      save('sch_lesson_save', { id: isNew ? '' : l.id, kind: lKind, target: val('lG'), ktype: lKind === '講座' ? lKT : '', fee: lKind === '講座' && lKT === '有料' ? val('lF') : '', feeNon: lKind === '講座' && lKT === '有料' ? val('lFN') : '', date: val('lD'), dates: dates, start: val('lS'), end: val('lE'), students: picked, mentorId: val('lM'), content: val('lC'), status: isNew ? '予定' : val('lT'), memo: val('lN'), notify: !!(nt && nt.checked) },
         dates && dates.length > 1 ? dates.length + '回分を登録しました' : '保存しました', this);
     };
     if (!isNew) document.getElementById('lDel').onclick = function(){ delSeries('この' + (lKind === '講座' ? '講座' : '授業') + 'を削除しますか？（キャンセルの場合は「状態」を変えてください）', 'sch_lesson_delete', l.id, l.series); };
@@ -707,7 +711,7 @@
     renderPicker();
     var cur = { id: id, kind: lKind, date: val('lD'), start: val('lS'), end: val('lE'), mentorId: val('lM'), students: picked };
     var ws = (cur.date && cur.start && cur.end) ? lessonWarnings(cur, id) : [];
-    var info = lKind === '個別' && picked.length >= 2 ? picked.length + '人で受講（2人以上の料金）' : lKind === '講座' && picked.length ? '参加者 ' + picked.length + '人' + (+val('lF') > 0 ? '（参加費 ' + (+val('lF')).toLocaleString() + '円 × ' + picked.length + '人 ＝ ' + (+val('lF') * picked.length).toLocaleString() + '円）' : '') : '';
+    var info = lKind === '個別' && picked.length >= 2 ? picked.length + '人で受講（2人以上の料金）' : lKind === '講座' ? (lKT === '有料' ? '有料講座　会員 ' + (+val('lF')).toLocaleString() + '円・非会員 ' + (+val('lFN')).toLocaleString() + '円' : '無料講座（会員は無料・ビジターは2,000円）') + (picked.length ? '　参加者 ' + picked.length + '人' : '') : '';
     document.getElementById('lWarn').innerHTML = (info ? '<span class="warn" style="background:var(--lesson);color:var(--lessonInk)">' + esc(info) + '</span>' : '')
       + ws.map(function(w){ return '<span class="warn">⚠ ' + esc(w) + '</span>'; }).join('');
   }
@@ -813,13 +817,13 @@
     var line = function(a, b, sub, neg){ return '<div class="att"><div><b>' + a + '</b>' + (sub ? '<div class="muted" style="font-size:12px">' + sub + '</div>' : '') + '</div><b style="white-space:nowrap' + (neg ? ';color:var(--warn)' : '') + '">' + b + '</b></div>'; };
     var h = '<div class="card"><p class="muted">' + esc(P.monthLabel) + 'の請求で計算 ／ 支払日 ' + (+pd[1]) + '月' + (+pd[2]) + '日' + (P.paid ? '　<span class="tag" style="background:#0F6E56;color:#fff">支払済み ' + esc(P.paidOn) + '</span>' : '') + '</p>'
       + line('教室サポート費用', yen(P.support), '月額利用料（入金済み）' + yen(P.fee.paid) + ' − ' + yen(P.rule.base) + ' の ' + Math.round(P.rule.support * 100) + '%<br>入金済み ' + P.fee.paidCount + '/' + P.fee.count + '件（月額利用料の請求額の合計 ' + yen(P.fee.all) + '）')
-      + line('個別授業（Kento）', yen(P.lessons.total), (P.lessons.manual != null ? '手入力' : '授業の記録から自動計算') + '・授業の対象期間 ' + esc(P.period) + '・高校生の講座を含む')
+      + line('個別授業（Kento）', yen(P.lessons.total), (P.lessons.manual != null ? '手入力' : '授業の記録から自動計算') + '・授業の対象期間 ' + esc(P.period) + '・有料講座を含む')
       + line('教室使用料（控除）', '−' + yen(P.room), '個別授業の ' + Math.round(P.rule.room * 100) + '%', true)
-      + line('中学生の英語講座', yen(P.eng.yen), P.eng.count + '回 × ' + yen(P.rule.eng) + (P.eng.manual != null ? '（回数は手入力）' : ''))
+      + line('無料講座（Kento）', yen(P.eng.yen), P.eng.count + '回 × ' + yen(P.rule.eng) + (P.eng.manual != null ? '（回数は手入力）' : ''))
       + '<div class="att" style="border-top:2px solid var(--ink);margin-top:4px"><b style="font-size:17px">お支払い額</b><b style="font-size:20px">' + yen(P.total) + '</b></div></div>';
     h += '<div class="card"><h2 style="font-size:16px">手入力・支払いの記録</h2>'
       + '<label class="f">個別授業（Kento）の合計額<input type="number" id="pyL" step="100" inputmode="numeric" placeholder="空欄なら自動計算（' + yen(P.lessons.auto) + '）" value="' + (P.lessons.manual != null ? P.lessons.manual : '') + '"></label>'
-      + '<label class="f">中学生の英語講座の回数<input type="number" id="pyE" min="0" inputmode="numeric" placeholder="空欄なら自動（' + P.eng.auto + '回）" value="' + (P.eng.manual != null ? P.eng.manual : '') + '"></label>'
+      + '<label class="f">無料講座の回数<input type="number" id="pyE" min="0" inputmode="numeric" placeholder="空欄なら自動（' + P.eng.auto + '回）" value="' + (P.eng.manual != null ? P.eng.manual : '') + '"></label>'
       + '<label class="f">メモ<textarea id="pyM" maxlength="300">' + esc(P.memo) + '</textarea></label>'
       + '<label class="f" style="display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="pyP" style="width:auto;display:inline"' + (P.paid ? ' checked' : '') + '>支払済み</label>'
       + '<label class="f">支払日<input type="date" id="pyD" value="' + (P.paidOn || P.payDay) + '"></label>'
@@ -827,7 +831,7 @@
     h += '<div class="card"><h2 style="font-size:16px">計算のもと（授業の記録）</h2>'
       + (P.lessons.detail.length ? P.lessons.detail.map(function(d){ return '<div class="att"><span>' + esc(d.date.slice(5).replace('-', '/')) + ' ' + esc(d.text) + '</span><span>' + yen(d.yen) + '</span></div>'; }).join('') : '<p class="muted">この期間のKentoの授業の記録はありません</p>')
       + (P.lessons.unknown ? '<p class="muted" style="color:var(--warn)">学年が分からず計算できなかった生徒が ' + P.lessons.unknown + '人分あります</p>' : '')
-      + (P.eng.list.length ? '<p style="margin-top:8px;font-weight:700">中学生の英語講座</p>' + P.eng.list.map(function(x){ return '<div class="muted">' + esc(x) + '</div>'; }).join('') : '') + '</div>';
+      + (P.eng.list.length ? '<p style="margin-top:8px;font-weight:700">無料講座</p>' + P.eng.list.map(function(x){ return '<div class="muted">' + esc(x) + '</div>'; }).join('') : '') + '</div>';
     document.getElementById('pyBox').innerHTML = h;
     document.getElementById('pySave').onclick = function(){
       var b = this; b.disabled = true;
