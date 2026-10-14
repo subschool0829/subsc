@@ -261,7 +261,7 @@
       document.getElementById('tabbar').hidden = false;
       document.getElementById('meName').textContent = r.me.name + 'さん' + (r.me.admin ? '（管理者）' : '');
       document.querySelector('#tabbar [data-p="money"]').hidden = !r.me.admin;
-      document.querySelector('#tabbar [data-p="bill"]').hidden = !r.me.owner;
+      document.querySelector('#tabbar [data-p="bill"]').hidden = !r.me.admin;
       document.getElementById('guideLink').hidden = !r.me.admin;
     document.getElementById('cmsgBox').hidden = !r.me.owner;
     if (r.me.owner && document.activeElement !== document.getElementById('cmsgT')) { document.getElementById('cmsgT').value = r.classMsg ? r.classMsg.text : ''; document.getElementById('cmsgAt').textContent = r.classMsg ? r.classMsg.at + ' 更新' : ''; }
@@ -1045,7 +1045,7 @@
     if (!D.me.admin) return;
     api('sch_money_visit_load').then(function(r){ VIS = r; renderVisit(); })
       .catch(function(e){ document.getElementById('vList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
-    if (D.me.owner) loadBill();
+    if (D.me.admin) loadBill();
   }
   function renderVisit(){
     document.getElementById('vSum').textContent = '未払い ' + VIS.unpaid + '件';
@@ -1129,7 +1129,7 @@
     var sum = function(f){ return L.filter(f).reduce(function(a, b){ return a + b.total; }, 0); };
     document.getElementById('bSum').innerHTML = '授業・食事の対象期間：' + esc(BILL.period) + '<br>'
       + '下書き ' + cnt(function(b){ return b.status === '下書き'; }) + '件　確定 ' + cnt(function(b){ return b.status === '確定'; }) + '件（未送付 ' + cnt(function(b){ return b.status !== '下書き' && !b.sent; }) + '）　入金済み ' + cnt(function(b){ return b.status === '入金済み'; }) + '件<br>'
-      + '請求合計 ' + yen(sum(function(){ return true; })) + '　入金済み ' + yen(sum(function(b){ return b.status === '入金済み'; })) + '　未入金 ' + yen(sum(function(b){ return b.status !== '入金済み'; }));
+      + (!D.me.owner ? '' : '請求合計 ' + yen(sum(function(){ return true; })) + '　入金済み ' + yen(sum(function(b){ return b.status === '入金済み'; })) + '　未入金 ' + yen(sum(function(b){ return b.status !== '入金済み'; })));
     var st = function(b){
       if (b.status === '入金済み') return '<span class="tag" style="background:#0F6E56;color:#fff">入金済み ' + esc(b.method) + '</span>';
       if (b.status === '確定') return '<span class="tag" style="background:var(--yellow)">確定' + (b.sent ? '・' + esc(b.sent) + '送付済み' : '・未送付') + '</span>';
