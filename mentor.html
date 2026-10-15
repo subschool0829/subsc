@@ -209,6 +209,12 @@
 <div id="mmList" style="margin-top:10px"><div class="loading">読み込み中…</div></div>
 </section>
 
+<section class="panel" id="p-room">
+<div class="row"><h2>在室中の生徒</h2><button class="btn" id="rmReload">更新</button></div>
+<p class="muted" id="rmCnt" style="margin-bottom:8px"></p>
+<div id="rmList"><div class="loading">読み込み中…</div></div>
+</section>
+
 <section class="panel" id="p-qr">
     <div class="card">
       <h2>出勤QR</h2>
@@ -232,6 +238,7 @@
 <nav class="tabbar" id="tabbar" hidden>
   <button data-p="week" aria-current="page">週の予定</button>
   <button data-p="req">依頼<span class="badge" id="reqBadge" hidden></span></button>
+  <button data-p="room" hidden>在室</button>
   <button data-p="events">行事</button>
   <button data-p="meal">食事</button>
   <button data-p="money" hidden>支払い</button>
@@ -277,6 +284,7 @@
       document.getElementById('meName').textContent = r.me.name + 'さん' + (r.me.admin ? '（管理者）' : '');
       document.querySelector('#tabbar [data-p="money"]').hidden = !r.me.admin;
       document.querySelector('#tabbar [data-p="bill"]').hidden = !r.me.admin;
+      document.querySelector('#tabbar [data-p="room"]').hidden = !r.me.admin;
     document.querySelector('#tabbar [data-p="pay"]').hidden = !r.me.owner;
       document.querySelector('#tabbar [data-p="mem"]').hidden = !r.me.owner;
       document.getElementById('guideLink').hidden = !r.me.admin;
@@ -950,6 +958,42 @@
     };
   }
 
+  // ===== 在室中の生徒（管理者のみ） =====
+  var RMD = null, rmTimer = null;
+  var RMC = { '会員': '#0F6E56', 'エリア外': '#2E6DB4', 'ビジター': '#B85C00', '未設定': '#888' };
+  function loadRoom(){
+    return api('sch_att_load').then(function(r){ RMD = r; renderRoom(); })
+      .catch(function(e){ document.getElementById('rmList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  function rmMin(since){
+    var m = /^(\d{1,2}):(\d{2})$/.exec(since || ''); if (!m) return '';
+    var n = new Date(), d = n.getHours() * 60 + n.getMinutes() - (+m[1] * 60 + +m[2]);
+    if (d < 0) return '';
+    return d >= 60 ? Math.floor(d / 60) + '時間' + (d % 60 ? d % 60 + '分' : '') : d + '分';
+  }
+  function renderRoom(){
+    if (!RMD) return;
+    var L = (RMD.inside || []).slice().sort(function(a, b){ return (a.since || '') < (b.since || '') ? -1 : 1; });
+    var cnt = {}; L.forEach(function(s){ var k = s.kind || '未設定'; cnt[k] = (cnt[k] || 0) + 1; });
+    var n = new Date();
+    document.getElementById('rmCnt').textContent = L.length + '人' + (L.length ? '（' + Object.keys(cnt).map(function(k){ return k + ' ' + cnt[k]; }).join('・') + '）' : '') + '　' + n.getHours() + ':' + ('0' + n.getMinutes()).slice(-2) + ' 現在';
+    var ms = (RMD.mentors || []).filter(function(m){ return m.date === RMD.today; });
+    var h = ms.length ? '<p class="muted" style="margin-bottom:8px">出勤中のメンター：' + ms.map(function(m){ return esc(m.name) + '（' + esc(m.since) + '〜）'; }).join('、') + '</p>' : '';
+    h += L.length ? L.map(function(s){
+      var k = s.kind || '未設定', st = rmMin(s.since);
+      return '<div class="card" style="padding:10px 14px;margin-bottom:6px"><div class="row"><div style="display:flex;align-items:center;gap:8px;min-width:0">'
+        + (s.kind ? '<span class="tag" style="margin-left:0;background:' + (RMC[k] || '#888') + ';color:#fff">' + esc(k) + '</span>' : '')
+        + '<b>' + esc(s.name) + '</b><span class="muted">' + esc(s.grade || '') + '</span></div>'
+        + '<span class="muted" style="white-space:nowrap;text-align:right">' + (s.since ? esc(s.since) + ' 入室' : '') + (st ? '<br>' + st : '') + '</span></div></div>';
+    }).join('') : '<div class="card muted">いま在室中の生徒はいません</div>';
+    document.getElementById('rmList').innerHTML = h;
+  }
+  document.getElementById('rmReload').onclick = function(){ loadRoom(); };
+  setInterval(function(){
+    var p = document.getElementById('p-room');
+    if (p && p.classList.contains('on') && !document.hidden) loadRoom();
+  }, 60000);
+
   // ===== QRの打ち忘れ =====
   var ATT = null;
   function loadAtt(){
@@ -1382,6 +1426,7 @@
     [].forEach.call(document.querySelectorAll('.panel'), function(el){ el.classList.toggle('on', el.id === 'p-' + p); });
     [].forEach.call(document.querySelectorAll('#tabbar button'), function(b){ if (b.dataset.p === p) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     window.scrollTo(0, 0);
+    if (p === 'room') loadRoom();
   }
   document.getElementById('tabbar').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if (b) showPanel(b.dataset.p); });
 
