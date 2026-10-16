@@ -202,10 +202,11 @@
 </section>
 
 <section class="panel" id="p-mem">
-<div class="row"><h2>在籍生徒</h2><span class="muted" id="mmCnt"></span></div>
+<div class="row"><h2>在籍生徒</h2><button class="btn yel" id="mmAdd">＋ 生徒を追加</button></div>
+<p class="muted" id="mmCnt" style="margin-bottom:4px"></p>
 <p class="muted" style="margin-bottom:8px;font-size:12px">生徒を押すと、会員の種別を「○月から」切り替えられます。切り替えは、その月の請求の下書きから反映されます。</p>
 <input type="search" id="mmQ" placeholder="名前で探す" style="display:block;width:100%;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:16px;margin-bottom:6px">
-<div class="seg" id="mmF"><button data-k="" aria-pressed="true">すべて</button><button data-k="会員">会員</button><button data-k="エリア外">エリア外</button><button data-k="ビジター">ビジター</button></div>
+<div class="seg" id="mmF"><button data-k="" aria-pressed="true">すべて</button><button data-k="会員">会員</button><button data-k="エリア外">エリア外</button><button data-k="ビジター">ビジター</button><button data-k="休会">休会・退会</button></div>
 <div id="mmList" style="margin-top:10px"><div class="loading">読み込み中…</div></div>
 </section>
 
@@ -930,6 +931,14 @@
     S.forEach(function(s){ cnt[s.kind] = (cnt[s.kind] || 0) + 1; });
     document.getElementById('mmCnt').textContent = S.length + '人（会員 ' + cnt['会員'] + '・エリア外 ' + cnt['エリア外'] + '・ビジター ' + cnt['ビジター'] + (cnt['未設定'] ? '・未設定 ' + cnt['未設定'] : '') + '）';
     var q = val('mmQ').replace(/\s/g, '');
+    if (mmFilter === '休会') {
+      var I = (MEMD.inactive || []).filter(function(s){ return !q || String(s.name).replace(/\s/g, '').indexOf(q) >= 0; })
+        .sort(function(a, b){ return a.status === b.status ? (a.id < b.id ? -1 : 1) : (a.status === '休会' ? -1 : 1); });
+      document.getElementById('mmList').innerHTML = I.length ? I.map(function(s){
+        return '<div class="card" data-isid="' + esc(s.id) + '" style="cursor:pointer;padding:10px 14px;margin-bottom:6px;opacity:.85"><div class="row"><div style="display:flex;align-items:center;gap:8px;min-width:0"><span class="tag" style="margin-left:0;background:' + (s.status === '休会' ? '#8A6D00' : '#777') + ';color:#fff">' + esc(s.status) + '</span><b>' + esc(s.name) + '</b></div><span class="muted" style="white-space:nowrap">' + esc(s.grade || '') + '</span></div></div>';
+      }).join('') : '<div class="card muted">休会・退会の生徒はいません</div>';
+      return;
+    }
     var L = S.filter(function(s){ return (!mmFilter || s.kind === mmFilter) && (!q || String(s.name).replace(/\s/g, '').indexOf(q) >= 0); });
     document.getElementById('mmList').innerHTML = L.length ? L.map(function(s){
       var pend = (s.pending || []).map(function(p){ return '<div class="muted" style="font-size:12px;color:var(--warn)">' + mlabel(p.from) + 'から ' + esc(mshort(p.kind || p.to)) + ' に変更予定</div>'; }).join('');
@@ -944,6 +953,8 @@
     renderMem();
   });
   document.getElementById('mmList').addEventListener('click', function(ev){
+    var ic = ev.target.closest('[data-isid]');
+    if (ic && MEMD) { var x = (MEMD.inactive || []).filter(function(s){ return s.id === ic.getAttribute('data-isid'); })[0]; if (x) memBack(x); return; }
     var c = ev.target.closest('[data-sid]'); if (!c || !MEMD) return;
     var sid = c.getAttribute('data-sid');
     var s = (MEMD.students || []).filter(function(x){ return x.id === sid; })[0];
@@ -960,7 +971,19 @@
       + '<label class="f">いつから<input type="month" id="mmM" value="' + ymNext(MEMD.month, 1) + '" min="' + esc(MEMD.month) + '"></label>'
       + '<label class="f">月額（円・変える場合だけ）<input type="number" id="mmFee" step="100" inputmode="numeric" placeholder="空欄なら今の月額のまま（ビジターは0円）"></label>'
       + '<p class="muted" style="font-size:12px">今月を選ぶとすぐ名簿に反映します。来月以降は、その月の1日に自動で反映します（請求の下書きはその月から新しい種別で作ります）。</p>'
-      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="mmOk">変更する</button></div></div>');
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="mmOk">変更する</button></div></div>'
+      + '<p style="font-weight:700;margin-top:18px">在籍状態</p><p class="muted" style="font-size:12px">休会・退会にすると、名簿・授業の生徒選び・請求の下書きから外れます（「休会・退会」から在籍に戻せます）。</p>'
+      + '<div style="display:flex;gap:8px;margin-top:6px"><button class="btn" data-st="休会">休会にする</button><button class="btn danger" data-st="退会">退会にする</button></div>');
+    Array.prototype.forEach.call(document.querySelectorAll('#sheet [data-st]'), function(b){
+      b.onclick = function(){
+        var st = b.getAttribute('data-st');
+        if (!confirm(s.name + 'さんを「' + st + '」にしますか？')) return;
+        b.disabled = true;
+        api('sch_mem_status', { sid: s.id, status: st })
+          .then(function(){ closeModal(); toast(s.name + 'さんを' + st + 'にしました'); return loadMem(); })
+          .catch(function(e){ toast(e.message); b.disabled = false; });
+      };
+    });
     Array.prototype.forEach.call(document.querySelectorAll('#sheet [data-cancel]'), function(b){
       b.onclick = function(){
         b.disabled = true;
@@ -978,6 +1001,55 @@
         .catch(function(e){ toast(e.message); b.disabled = false; });
     };
   }
+
+  // 休会・退会の生徒を在籍に戻す
+  function memBack(s){
+    openModal('<h2>' + esc(s.name) + '</h2>'
+      + '<p class="muted">' + esc(s.grade || '') + '　いまの状態：' + esc(s.status) + '</p>'
+      + '<p class="muted" style="margin-top:8px">在籍に戻すと、名簿・授業の生徒選び・請求の下書きに出てくるようになります。会員の種別や月額が変わる場合は、戻したあとに名簿で生徒を押して変更してください。</p>'
+      + '<p class="muted" style="margin-top:6px">種別：' + esc(s.kindRaw || '未設定') + '　月額：' + (s.fee !== '' && s.fee != null ? esc(s.fee) + '円' : '未設定') + '</p>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="mmBack">在籍に戻す</button></div></div>');
+    document.getElementById('mmBack').onclick = function(){
+      var b = this; b.disabled = true;
+      api('sch_mem_status', { sid: s.id, status: '在籍' })
+        .then(function(){ closeModal(); toast(s.name + 'さんを在籍に戻しました'); mmFilter = ''; Array.prototype.forEach.call(document.querySelectorAll('#mmF button'), function(x){ x.setAttribute('aria-pressed', x.getAttribute('data-k') === '' ? 'true' : 'false'); }); return loadMem(); })
+        .catch(function(e){ toast(e.message); b.disabled = false; });
+    };
+  }
+  // 新しい生徒を登録
+  var GRADES = ['小１','小２','小３','小４','小５','小６','中１','中２','中３','高１','高２','高３','既卒','その他'];
+  document.getElementById('mmAdd').onclick = function(){
+    if (!MEMD) return;
+    var kinds = (MEMD.kinds || []).map(function(k){ return '<option value="' + esc(k) + '">' + esc(k) + '</option>'; }).join('');
+    openModal('<h2>生徒を追加</h2>'
+      + '<label class="f">名前<input id="naN" maxlength="30" placeholder="例：山田 太郎"></label>'
+      + '<label class="f">学年<select id="naG"><option value="">選んでください</option>' + GRADES.map(function(g){ return '<option>' + g + '</option>'; }).join('') + '</select></label>'
+      + '<label class="f">会員の種別<select id="naK">' + kinds + '</select></label>'
+      + '<label class="f">月額（円）<input type="number" id="naF" step="100" inputmode="numeric" placeholder="例：21000（ビジターは0円）"></label>'
+      + '<label class="f">家族ID（兄弟がいる場合だけ）<input id="naM" maxlength="10" placeholder="例：F003（兄弟と同じIDにすると請求が1枚にまとまります）"></label>'
+      + '<p class="muted" style="font-size:12px">登録すると、生徒IDとLINEの登録コードが自動で発行されます。</p>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">やめる</button><button class="btn pri" id="naOk">登録する</button></div></div>');
+    var force = false;
+    document.getElementById('naOk').onclick = function(){
+      var b = this;
+      if (!val('naN')) { toast('名前を入れてください'); return; }
+      b.disabled = true;
+      api('sch_mem_add', { name: val('naN'), grade: val('naG'), kind: val('naK'), fee: val('naF'), fam: val('naM'), force: force })
+        .then(function(r){
+          loadMem();
+          openModal('<h2>登録しました</h2><p style="font-size:18px;font-weight:900;margin-top:8px">' + esc(r.name) + 'さん</p>'
+            + '<div class="att"><span>生徒ID</span><b>' + esc(r.sid) + '</b></div>'
+            + '<div class="att"><span>LINE登録コード</span><b style="font-size:20px;letter-spacing:.1em">' + esc(r.code) + '</b></div>'
+            + '<p class="muted" style="margin-top:8px">保護者に公式LINEでこのコードを送ってもらうと、入退室の通知が届くようになります。QRカードは「QRカード印刷ページ」を開き直すと出てきます。</p>'
+            + '<div class="acts"><div class="r"><button class="btn pri" onclick="closeModal()">閉じる</button></div></div>');
+        })
+        .catch(function(e){
+          b.disabled = false;
+          if (/すでに名簿/.test(e.message) && !force) { force = true; alert(e.message); return; }
+          toast(e.message);
+        });
+    };
+  };
 
   // ===== 在室中の生徒（管理者のみ） =====
   var RMD = null, rmTimer = null;
