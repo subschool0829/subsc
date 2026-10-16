@@ -180,6 +180,61 @@ function near(text, ratio){
   if (text === candText) candCount++; else { candText = text; candCount = 1; }
   if (candCount >= 2) { candCount = 0; onCode(text); }
 }
+// ===== すぐ表示：名簿と在室状態を手元に持っておき、送信は裏で行う =====
+var ROSTER = null, rosterAt = 0;
+function loadRoster(){
+  if (!KEY) return;
+  var started = Date.now();
+  fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_roster', key:KEY }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (!r || !r.ok) return;
+      var old = ROSTER, R = { s:{}, m:{} };
+      var put = function(map, a, oldMap){
+        a.forEach(function(x){
+          var o = oldMap && oldMap[x[0]];
+          // 読み込み中に受付した人は、手元の状態を優先
+          if (o && o.touched && o.touched > started - 120000) { map[x[0]] = o; return; }
+          map[x[0]] = { name: x[1], in: !!x[2], last: x[3] || 0 };
+        });
+      };
+      put(R.s, r.students || [], old && old.s);
+      put(R.m, r.mentors || [], old && old.m);
+      ROSTER = R; rosterAt = Date.now();
+    }).catch(function(){});
+}
+loadRoster();
+setInterval(loadRoster, 3 * 60 * 1000);
+document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible' && Date.now() - rosterAt > 60000) loadRoster(); });
+
+function hm(){ var d = new Date(); return d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2); }
+function warn(t){
+  var w = document.getElementById('kwarn');
+  if (!w) {
+    w = document.createElement('div'); w.id = 'kwarn';
+    w.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:50;background:#B3261E;color:#fff;border-radius:14px;padding:12px 16px;font-size:16px;font-weight:700;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.25)';
+    w.onclick = function(){ w.remove(); };
+    document.body.appendChild(w);
+  }
+  var p = document.createElement('div'); p.textContent = '⚠ ' + t + '（先生に知らせてください／タップで消えます）';
+  w.appendChild(p);
+}
+// 裏で送る（失敗したら何回かやり直す）
+function sendBg(text, photo, ent, act, tries){
+  tries = tries || 0;
+  fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'checkin', key:KEY, qr:text, photo:photo }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (!r || !r.ok) { warn(ent.name + 'さんの' + act + 'を記録できませんでした：' + ((r && r.message) || 'エラー')); ent.in = act !== '入室'; return; }
+      if (r.action) ent.in = r.action === '入室';
+      if (r.action && r.action !== act) warn(ent.name + 'さんは「' + r.action + '」として記録されています');
+    })
+    .catch(function(){
+      if (tries < 3) setTimeout(function(){ sendBg(text, photo, ent, act, tries + 1); }, [4000, 10000, 20000][tries]);
+      else warn(ent.name + 'さんの' + act + 'を記録できませんでした（通信エラー）');
+    });
+}
+
 function onCode(text){
     if (busy) return;
     var now = Date.now();
@@ -189,6 +244,34 @@ function onCode(text){
       busy = true; beep(220, .25);
       show('err', 'このQRコードは使えません', '', '教室のカードをかざしてね', '');
       setTimeout(reset, 2500);
+      return;
+    }
+    var id = text.slice(6).trim(), isM = /^M\d+$/.test(id);
+    var ent = ROSTER && (isM ? ROSTER.m[id] : ROSTER.s[id]);
+    if (ent) {
+      busy = true; beep(880, .12);
+      if (Date.now() - ent.last < 60000) {
+        beep(660, .15);
+        show(ent.in ? 'in' : 'out', 'もう受付ずみです', ent.name + 'さん', (ent.in ? '入室' : '退室') + 'は記録されています', '');
+        setTimeout(reset, 2500);
+        return;
+      }
+      var act = ent.in ? '退室' : '入室';
+      var done = function(photo){
+        ent.in = act === '入室'; ent.last = Date.now(); ent.touched = Date.now();
+        if (isM) {
+          chime(act === '入室');
+          show(act === '入室' ? 'in' : 'out', act === '入室' ? '出勤しました' : 'おつかれさまでした', ent.name + 'さん', (act === '入室' ? '出勤 ' : '退勤 ') + hm(), act === '入室' ? 'よろしくお願いします' : '');
+        } else {
+          chime(act === '入室');
+          show(act === '入室' ? 'in' : 'out', act === '入室' ? 'ようこそ！' : 'おつかれさま！', ent.name + 'さん', act + ' ' + hm(), act === '入室' ? 'おうちの人に知らせるね' : '気をつけて帰ってね');
+        }
+        setTimeout(reset, 3000);
+        sendBg(text, photo, ent, act);
+      };
+      if (isM) { done(''); return; }
+      show('wait', 'そのまま カメラを見てね', '', '', '', true);
+      setTimeout(function(){ done(capture()); }, 800);
       return;
     }
     busy = true; beep(880, .12);
@@ -205,20 +288,20 @@ function onCode(text){
           lastText = '';
           setTimeout(reset, 3000);
         });
-    }, 1400);
+    }, 900);
   }
 
   function capture(){
     var vw = video.videoWidth, vh = video.videoHeight;
     if (!vw) return '';
-    var w = 720, h = Math.round(vh * w / vw);
+    var w = 640, h = Math.round(vh * w / vw);
     var c = document.createElement('canvas');
     c.width = w; c.height = h;
     var ctx = c.getContext('2d');
     ctx.drawImage(video, 0, 0, w, h);
     var f = document.getElementById('flash');
     f.classList.remove('on'); void f.offsetWidth; f.classList.add('on');
-    return c.toDataURL('image/jpeg', 0.78);
+    return c.toDataURL('image/jpeg', 0.72);
   }
 
   function result(r){

@@ -137,15 +137,20 @@ function renderNow(n){
         return '<div class="dd"><div class="dt ' + cls + '">' + (+p[1]) + '/' + (+p[2]) + '<small>' + d.wd + '曜</small>' + (d.date === r.today ? '<span class="td">今日</span>' : '') + (none ? '<span class="nomt">メンター不在の日です</span>' : '') + '</div>' + rows + '</div>';
       }).join('');
   }
+  // 前回の予定を端末に覚えておき、開いた瞬間に表示（いまの教室の欄は最新を読み込んでから表示）
+  var CK = 'subsc_pub_cache', loaded = false;
+  try { var c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.r && Date.now() - c.at < 12 * 3600000) renderDays(c.r); } catch(e){}
   function load(){
   return fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'sch_public' }) })
     .then(function(r){ return r.json(); })
     .then(function(r){
       if (!r.ok) throw new Error();
+      loaded = true;
       renderNow(r.now);
       renderDays(r);
+      try { localStorage.setItem(CK, JSON.stringify({ at: Date.now(), r: r })); } catch(e){}
     })
-    .catch(function(){ document.getElementById('days').innerHTML = '<p class="none">予定を読み込めませんでした。時間をおいて開き直してください。</p>'; });
+    .catch(function(){ if (!loaded) document.getElementById('days').innerHTML = '<p class="none">予定を読み込めませんでした。時間をおいて開き直してください。</p>'; });
   }
   load();
   setInterval(load, 60000);

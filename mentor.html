@@ -275,8 +275,32 @@
         return r;
       });
   }
+  // 前回の内容を端末に覚えておき、開いた瞬間に表示（最新の内容は裏で読み込んで差し替え）
+  var CACHE_K = 'subsc_sch_cache_' + KEY.slice(0, 8);
+  function cacheGet(){ try { var c = JSON.parse(localStorage.getItem(CACHE_K) || 'null'); return c && c.r && c.r.me ? c : null; } catch(e){ return null; } }
+  function cachePut(r){ try { localStorage.setItem(CACHE_K, JSON.stringify({ at: Date.now(), r: r })); } catch(e){} }
+  var firstLoad = true, homeFrom = null;
   function load(){
-    return api('sch_load', { from: weekFrom, days: 7 }).then(function(r){
+    var wf = weekFrom;
+    if (firstLoad && !D && !wf) {
+      var c = cacheGet();
+      if (c && Date.now() - c.at < 12 * 3600000) { try { applyLoad(c.r, true); } catch(e){ D = null; } }
+    }
+    firstLoad = false;
+    return api('sch_load', { from: wf, days: 7 }).then(function(r){
+      if (!wf) homeFrom = r.from;
+      if (!wf || wf === homeFrom) cachePut(r);
+      if (!wf) weekFrom = r.from;
+      applyLoad(r, false);
+    }).catch(function(e){
+      if (e.auth || !D) {
+        try { localStorage.removeItem(CACHE_K); } catch(x){}
+        document.getElementById('boot').outerHTML = '<div class="msg"><b>' + esc(e.message) + '</b><p class="muted" style="margin-top:8px">管理者から受け取った専用のURLで開いてください。</p></div>';
+      } else toast(e.message);
+    });
+  }
+  function applyLoad(r, cached){
+    {
       D = r;
       if (!weekFrom) weekFrom = r.from;
       document.getElementById('boot').style.display = 'none';
@@ -291,12 +315,9 @@
     document.getElementById('cmsgBox').hidden = !r.me.owner;
     if (r.me.owner && document.activeElement !== document.getElementById('cmsgT')) { document.getElementById('cmsgT').value = r.classMsg ? r.classMsg.text : ''; document.getElementById('cmsgAt').textContent = r.classMsg ? r.classMsg.at + ' 更新' : ''; }
       if (!document.querySelector('.panel.on')) showPanel('week');
-      renderWeek(); renderEvents(); renderQr(); loadAtt(); loadReq(); loadMeal(); loadMoney();
-    }).catch(function(e){
-      if (e.auth || !D) {
-        document.getElementById('boot').outerHTML = '<div class="msg"><b>' + esc(e.message) + '</b><p class="muted" style="margin-top:8px">管理者から受け取った専用のURLで開いてください。</p></div>';
-      } else toast(e.message);
-    });
+      renderWeek(); renderEvents(); renderQr();
+      if (!cached) { loadAtt(); loadReq(); loadMeal(); loadMoney(); }
+    }
   }
 
   // ===== 日付 =====
