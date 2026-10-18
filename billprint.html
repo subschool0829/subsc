@@ -63,13 +63,13 @@
   .done{margin-top:6mm;background:var(--tint);border-radius:4mm;padding:5mm 6mm;font-size:11pt;font-weight:700;line-height:1.8}
   @media print{
     @page{size:A4;margin:10mm}
-    body{background:#fff}
+    html,body{background:#fff;margin:0;padding:0}
     .bar,.msg{display:none!important}
-    /* Safariは印刷の余白を自動で取るため、1枚分を少し小さめ（190×270mm）にして白紙ページが出ないようにする */
-    .page{margin:0;box-shadow:none;break-after:page;page-break-after:always;width:190mm;min-height:0;height:270mm;padding:4mm 6mm 3mm;overflow:hidden}
-    .page .iss{left:6mm;right:6mm;bottom:3mm}
-    .page .draft{top:2mm;right:6mm}
-    .page:last-child{break-after:auto}
+    /* Safariで白紙が挟まらないよう、高さは固定せず、2枚目以降だけ「ここから新しいページ」にする */
+    .page{margin:0;box-shadow:none;width:auto;min-height:0;height:auto;padding:2mm 4mm 0;overflow:visible;break-after:auto;page-break-after:auto;break-inside:avoid;page-break-inside:avoid}
+    .page + .page{break-before:page;page-break-before:always}
+    .page .iss{position:static;margin-top:6mm}
+    .page .draft{top:0;right:4mm}
   }
 </style>
 </head>
