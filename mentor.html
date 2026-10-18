@@ -191,7 +191,7 @@
   <section class="panel" id="p-bill">
     <div class="row"><h2>請求</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn" id="bPrev" aria-label="前の月">◀</button><b id="bMonth"></b><button class="btn" id="bNext" aria-label="次の月">▶</button></div></div>
     <p class="muted" id="bSum" style="margin:6px 0 10px"></p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="bBuild">下書きを作成</button><button class="btn" id="bConfirm">下書きをすべて確定</button><button class="btn yel" id="bSend">確定分をLINE・メールで送付</button><button class="btn" id="bPaper">紙の請求書を印刷</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="bBuild">下書きを作成</button><button class="btn" id="bConfirm">下書きをすべて確定</button><button class="btn yel" id="bSend">確定分をLINE・メールで送付</button><button class="btn" id="bPaper">紙の請求書を印刷</button><button class="btn yel" id="bAddStu">＋ 請求する生徒を追加</button></div>
     <p class="muted" style="margin-bottom:10px;font-size:12px">下書きは、名簿の月額・割引・家族IDと、授業・講座・食事の記録から作ります。家族を押すと、項目と金額を直したり、模試・テキスト代などを追加したりできます。入金の記録もここから付けます。</p>
     <div id="bList"><div class="loading">読み込み中…</div></div>
   </section>
@@ -1441,6 +1441,39 @@
     return api(action, Object.assign({ month: billMonth }, data || {})).then(function(r){ if (msg) toast(typeof msg === 'function' ? msg(r) : msg); return loadBill(); }).catch(function(e){ toast(e.message); });
   }
   document.getElementById('bPaper').onclick = function(){ window.open('billprint.html#' + billMonth, '_blank'); };
+  // 請求する生徒を追加（ビジター・休会中・体験など、下書きに出てこない生徒にも請求できる）
+  document.getElementById('bAddStu').onclick = function(){
+    var p = billMonth.split('-');
+    openModal('<h3>請求する生徒を追加（' + (+p[0]) + '年' + (+p[1]) + '月分）</h3>'
+      + '<p class="muted" style="font-size:12px">ビジター・休会中・体験などで請求の下書きに出てこない生徒にも、請求を作れます。生徒を選ぶと請求の画面が開くので、「＋ 項目を追加」で内容と金額を入れて保存してください。</p>'
+      + '<input type="search" id="baQ" placeholder="名前で探す" style="display:block;width:100%;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:16px;margin-top:8px">'
+      + '<div id="baList" style="margin-top:8px;max-height:50vh;overflow:auto"><div class="loading">読み込み中…</div></div>'
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">閉じる</button></div></div>');
+    var ALL = [];
+    var draw = function(){
+      var q = val('baQ').replace(/\s/g, ''), has = {};
+      (BILL ? BILL.list : []).forEach(function(b){ b.items.forEach(function(i){ if (i.sid) has[i.sid] = true; }); });
+      var L = ALL.filter(function(s){ return !q || String(s.name).replace(/\s/g, '').indexOf(q) >= 0; })
+        .sort(function(a, b){ var o = { '在籍': 0, '休会': 1, '退会': 2 }; return (o[a.status] || 0) - (o[b.status] || 0) || (a.id < b.id ? -1 : 1); });
+      document.getElementById('baList').innerHTML = L.length ? L.slice(0, 80).map(function(s){
+        return '<button class="item" style="background:var(--bg);color:var(--ink);padding:10px 12px;text-align:left" data-sid="' + esc(s.id) + '"><b>' + esc(s.name) + '</b> <span class="muted">' + esc(s.grade || '') + '</span>'
+          + '<small>' + esc(s.status) + (s.kind ? '・' + esc(s.kind) : '') + (has[s.id] ? '・この月の請求あり' : '') + '</small></button>';
+      }).join('') : '<p class="muted">該当する生徒はいません</p>';
+    };
+    api('sch_bill_students', {}).then(function(r){ ALL = r.list || []; draw(); })
+      .catch(function(e){ document.getElementById('baList').innerHTML = '<p class="muted">' + esc(e.message) + '</p>'; });
+    document.getElementById('baQ').oninput = draw;
+    document.getElementById('baList').onclick = function(ev){
+      var b = ev.target.closest('[data-sid]'); if (!b) return;
+      b.disabled = true;
+      api('sch_bill_add', { month: billMonth, sid: b.dataset.sid }).then(function(r){
+        return loadBill().then(function(){
+          var x = BILL.list.filter(function(y){ return y.id === r.id; })[0];
+          if (x) { if (r.existed) toast('この家族の請求はすでにあります。項目を追加してください'); billDetail(x); } else closeModal();
+        });
+      }).catch(function(e){ toast(e.message); b.disabled = false; });
+    };
+  };
   document.getElementById('bPrev').onclick = function(){ billMonth = ymNext(billMonth, -1); loadBill(); };
   document.getElementById('bNext').onclick = function(){ billMonth = ymNext(billMonth, 1); loadBill(); };
   document.getElementById('bBuild').onclick = function(){
