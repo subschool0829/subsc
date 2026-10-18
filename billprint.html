@@ -68,7 +68,9 @@
     /* Safariで白紙が挟まらないよう、高さは固定せず、2枚目以降だけ「ここから新しいページ」にする */
     .page{margin:0;box-shadow:none;width:auto;min-height:0;height:auto;padding:2mm 4mm 0;overflow:visible;break-after:auto;page-break-after:auto;break-inside:avoid;page-break-inside:avoid}
     .page + .page{break-before:page;page-break-before:always}
-    .page .iss{position:static;margin-top:6mm}
+    .page .iss{position:static;margin-top:5mm}
+    /* 明細が多い家族でも1枚に収まるよう、印刷時は少しだけ縮小 */
+    .page{zoom:.86}
     .page .draft{top:0;right:4mm}
   }
 </style>
