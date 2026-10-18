@@ -66,6 +66,7 @@
 <div class="bar" id="bar" hidden>
   <b>登録のご案内（1人1枚）</b>
   <select id="filter"><option value="unlinked">LINE未登録の生徒だけ</option><option value="all">全員</option></select>
+  <select id="one"><option value="">1人だけ選ぶ…</option></select>
   <button class="pri" id="printBtn">印刷する</button>
   <span class="n" id="count"></span>
 </div>
@@ -102,14 +103,15 @@
       + '</section>';
   }
   function render(){
-    var mode = document.getElementById('filter').value;
-    var list = S.filter(function(s){ return mode === 'all' || !s.linked; });
+    var mode = document.getElementById('filter').value, one = document.getElementById('one').value;
+    var list = one ? S.filter(function(s){ return s.id === one; }) : S.filter(function(s){ return mode === 'all' || !s.linked; });
     document.getElementById('count').textContent = list.length + '人分（' + list.length + '枚）';
     var box = document.getElementById('pages');
     box.innerHTML = list.map(page).join('');
     [].forEach.call(box.querySelectorAll('[data-qr]'), function(el){ qr(el, el.getAttribute('data-qr')); });
   }
-  document.getElementById('filter').onchange = render;
+  document.getElementById('filter').onchange = function(){ document.getElementById('one').value = ''; render(); };
+  document.getElementById('one').onchange = render;
   document.getElementById('printBtn').onclick = function(){ window.print(); };
   if (!KEY) {
     document.getElementById('boot').innerHTML = '<b>このページは開けません</b><p style="margin-top:8px;color:#5E5E5E">メンター用ページを一度開いたパソコン（管理者）で開いてください。</p>';
@@ -119,6 +121,11 @@
       .then(function(r){
         if (!r.ok) throw new Error(r.message || 'エラーが起きました');
         S = r.students;
+        // 1人だけ印刷（メンターページの名簿から「#s=生徒ID」で開いたとき）
+        var sel = document.getElementById('one');
+        sel.innerHTML = '<option value="">1人だけ選ぶ…</option>' + S.slice().sort(function(a, b){ return a.id < b.id ? 1 : -1; }).map(function(s){ return '<option value="' + esc(s.id) + '">' + esc(s.name) + '（' + esc(s.id) + '）</option>'; }).join('');
+        var hs = (location.hash.match(/s=(S\d+)/) || [])[1];
+        if (hs) sel.value = hs;
         document.getElementById('boot').hidden = true;
         document.getElementById('bar').hidden = false;
         render();
