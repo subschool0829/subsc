@@ -69,15 +69,21 @@
     .page{margin:0;box-shadow:none;width:auto;min-height:0;height:auto;padding:2mm 4mm 0;overflow:visible;break-after:auto;page-break-after:auto;break-inside:avoid;page-break-inside:avoid}
     .page + .page{break-before:page;page-break-before:always}
     .page .iss{position:static;margin-top:5mm}
-    /* 明細が多い家族でも1枚に収まるよう、印刷時は少しだけ縮小 */
-    .page{zoom:.86}
+    /* 明細が多い家族でも1枚に収まるよう、印刷時は文字と行間を少し詰める（Safariでも効く方法） */
+    .page{font-size:9.5pt}
+    .page h1{font-size:18pt;padding-bottom:2mm}
+    .page h2{font-size:15pt;padding-bottom:2mm}
+    .page td{padding:1.2mm 1mm}
+    .page th{padding:1mm 1mm}
+    .page .to{font-size:13pt}
+    .page .iss{margin-top:3mm;padding-top:2mm}
     .page .draft{top:0;right:4mm}
   }
 </style>
 </head>
 <body>
 <div class="bar">
-  <b id="ttl">紙の請求書</b>
+  <b id="ttl">紙の請求書</b><small style="color:#888">（印刷版 v8）</small>
   <label>発行日 <input type="date" id="issue"></label>
   <label><input type="checkbox" id="showDraft">下書きも表示（確認用）</label>
   <span id="cnt" style="font-size:13px;color:var(--sub)"></span>
