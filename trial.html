@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>体験利用のご案内（印刷用）｜みんなのサブスク</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{--ink:#1A1A1A;--sub:#5E5E5E;--line:#D9D4C4;--yellow:#F7CE2E;--tint:#FFF5CC;--soft:#F7F6F2}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;color:var(--ink);background:#e9e7e1;font-weight:500;line-height:1.6}
+  .bar{position:sticky;top:0;z-index:5;background:#fff;border-bottom:4px solid var(--yellow);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .bar b{font-weight:900}
+  .bar button{font:inherit;font-weight:700;font-size:14px;border:1.5px solid var(--ink);border-radius:999px;padding:6px 16px;background:var(--ink);color:#fff;cursor:pointer}
+  .bar span{color:var(--sub);font-size:13px}
+  .page{width:210mm;min-height:297mm;margin:12px auto;background:#fff;padding:13mm 15mm 10mm;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3mm solid var(--yellow);padding-bottom:2mm}
+  .brand{font-size:11pt;font-weight:900}
+  .title{font-size:21pt;font-weight:900;line-height:1.2}
+  .lead{margin-top:4mm;font-size:10.5pt}
+  .period{margin-top:5mm;border:0.7mm solid var(--ink);border-radius:4mm;padding:4mm 6mm;display:flex;align-items:center;gap:4mm;flex-wrap:wrap}
+  .period .lb{font-size:12pt;font-weight:900;background:var(--ink);color:#fff;border-radius:2mm;padding:1mm 3mm}
+  .period .dt{font-size:16pt;font-weight:900;display:flex;align-items:flex-end;gap:1.5mm}
+  .period .blank{display:inline-block;border-bottom:0.5mm solid var(--ink);width:16mm;height:9mm}
+  .period .blank.s{width:11mm}
+  .period small{font-size:10pt;font-weight:700;color:var(--sub)}
+  .consult{margin-top:4mm;background:var(--tint);border-radius:4mm;padding:4mm 6mm;font-size:11pt;line-height:1.75}
+  .consult b{font-weight:900}
+  .consult .ex{display:block;margin-top:1.5mm;font-size:9.5pt;color:var(--sub)}
+  h2{margin-top:6mm;font-size:13pt;font-weight:900;border-left:2mm solid var(--yellow);padding-left:3mm}
+  .steps{margin-top:3mm;display:grid;gap:3mm}
+  .step{display:flex;gap:3mm;font-size:10.5pt}
+  .step .no{flex:none;width:7.5mm;height:7.5mm;border-radius:50%;background:var(--ink);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:10.5pt}
+  .step b{font-weight:900}
+  .step .sub{display:block;font-size:9.5pt;color:var(--sub)}
+  .qrs{margin-top:5mm;display:grid;grid-template-columns:1fr 1fr;gap:6mm}
+  .qbox{border:0.4mm solid var(--line);border-radius:3mm;padding:3.5mm;display:flex;gap:4mm;align-items:center}
+  .qbox .q{flex:none;width:40mm;height:40mm}
+  .qbox .q img,.qbox .q canvas{width:40mm!important;height:40mm!important}
+  .qbox b{font-size:12pt;font-weight:900;display:block}
+  .qbox span{font-size:8.5pt;color:var(--sub);display:block;word-break:break-all}
+  .memo{margin-top:6mm;display:flex;gap:6mm;font-size:10pt;color:var(--sub)}
+  .memo div{flex:1;border-bottom:0.3mm solid var(--line);padding-bottom:1mm}
+  .foot{margin-top:5mm;text-align:center;font-size:8.5pt;color:var(--sub)}
+  @media print{
+    @page{size:A4;margin:10mm}
+    html,body{background:#fff;margin:0;padding:0}
+    .bar{display:none!important}
+    .page{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div class="bar"><b>体験利用のご案内（A4・1枚）</b><button onclick="window.print()">印刷する</button><span>名前の入っていない共通の案内です。体験期間の日付は手書きで記入してください。</span></div>
+
+<section class="page">
+  <div class="head"><div><div class="brand">みんなのサブスク</div><div class="title">体験利用のご案内</div></div><div class="brand">保護者の方へ</div></div>
+
+  <p class="lead">体験利用のお申し込みありがとうございます。体験中も、入退室の記録やおうちの方へのLINEのお知らせが使えるよう、下の手続きをお願いいたします。</p>
+
+  <div class="period">
+    <span class="lb">体験期間</span>
+    <span class="dt"><span class="blank"></span>月<span class="blank"></span>日<small>（</small><span class="blank s"></span><small>）</small>まで</span>
+    <small>（予定）</small>
+  </div>
+
+  <div class="consult">
+    体験期間が終わるまでに、<b>入会のご相談をご希望の方は、ご希望の日時を公式LINEでお知らせください。</b>
+    <span class="ex">例：「入会相談希望　〇月〇日（〇）〇時ごろ」と、公式LINEのトークに送ってください。</span>
+  </div>
+
+  <h2>体験中の手続き</h2>
+  <div class="steps">
+    <div class="step"><span class="no">1</span><div><b>保護者の方が、公式LINEを友だち追加</b><span class="sub">左下のQRコード「公式LINE」を読み取ってください。</span></div></div>
+    <div class="step"><span class="no">2</span><div><b>在籍登録フォームを入力（5分ほど）</b><span class="sub">右下のQRコードから。送信すると「体験生」として登録され、登録コードが発行されます。</span></div></div>
+    <div class="step"><span class="no">3</span><div><b>教室で「入退室カード」と「登録コード」をお渡しします</b><span class="sub">カードは、教室に入るときと帰るときに、入口のタブレットにかざします。</span></div></div>
+    <div class="step"><span class="no">4</span><div><b>公式LINEのトークに、登録コードを送る</b><span class="sub">お子さまの入室・退室が、LINEでお知らせされるようになります。</span></div></div>
+  </div>
+
+  <div class="qrs">
+    <div class="qbox"><div class="q" data-qr="https://lin.ee/UcXLGVg"></div><div><b>公式LINE</b><span>友だち追加</span><span>https://lin.ee/UcXLGVg</span></div></div>
+    <div class="qbox"><div class="q" data-qr="https://forms.gle/5XpmWff4jCFtaGeZ6"></div><div><b>在籍登録フォーム</b><span>保護者の方が入力</span><span>https://forms.gle/5XpmWff4jCFtaGeZ6</span></div></div>
+  </div>
+
+  <div class="memo"><div>お名前</div><div>学年</div><div>体験開始日　　　月　　　日</div></div>
+
+  <div class="foot">みんなのサブスク　石川県かほく市宇野気ト62-1 江川ビル2階</div>
+</section>
+
+<script>
+  [].forEach.call(document.querySelectorAll('[data-qr]'), function(el){
+    new QRCode(el, { text: el.getAttribute('data-qr'), width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M });
+  });
+</script>
+</body>
+</html>
