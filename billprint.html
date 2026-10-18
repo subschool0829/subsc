@@ -62,10 +62,13 @@
   .step .codes{margin-top:1.5mm;font-size:10pt}
   .done{margin-top:6mm;background:var(--tint);border-radius:4mm;padding:5mm 6mm;font-size:11pt;font-weight:700;line-height:1.8}
   @media print{
-    @page{size:A4;margin:0}
+    @page{size:A4;margin:10mm}
     body{background:#fff}
     .bar,.msg{display:none!important}
-    .page{margin:0;box-shadow:none;break-after:page;height:297mm;overflow:hidden}
+    /* Safariは印刷の余白を自動で取るため、1枚分を少し小さめ（190×270mm）にして白紙ページが出ないようにする */
+    .page{margin:0;box-shadow:none;break-after:page;page-break-after:always;width:190mm;min-height:0;height:270mm;padding:6mm 6mm 4mm;overflow:hidden}
+    .page .iss{left:6mm;right:6mm;bottom:4mm}
+    .page .draft{top:2mm;right:6mm}
     .page:last-child{break-after:auto}
   }
 </style>
