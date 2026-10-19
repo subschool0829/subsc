@@ -393,6 +393,16 @@ function renderNow(n){
     document.getElementById('form').hidden = false;
     window.scrollTo(0, 0);
   }
+  // 授業の時間（開始〜開始+授業の長さ）がメンターの在室予定に収まっているメンター
+  function slotCover(day, mid, s, e){
+    var bm = day.byMentor || {};
+    return (mid ? [mid] : Object.keys(bm)).filter(function(id){ return (bm[id] || []).some(function(p){ return mins(p[0]) <= s && mins(p[1]) >= e; }); });
+  }
+  // 在室しているメンター全員が、ほかの授業と重なっているか
+  function slotClash(day, mid, s, e){
+    var c = slotCover(day, mid, s, e), bz = day.busy || {};
+    return c.length > 0 && c.every(function(id){ return (bz[id] || []).some(function(b){ return mins(b[0]) < e && s < mins(b[1]); }); });
+  }
   function hint(i){
     var d = document.getElementById('d' + i).value, t = document.getElementById('t' + i).value, el = document.getElementById('h' + i);
     if (!d) { el.innerHTML = ''; return; }
@@ -401,14 +411,15 @@ function renderNow(n){
     var m = D.mentors.filter(function(x){ return x.id === mid; })[0];
     var who = m ? m.name + 'さん' : 'メンター';
     var parts = [];
-    if (!day) parts.push('<span>' + esc(who) + 'の予定はまだ決まっていない日です。相談になります。</span>');
+    if (!day) parts.push('<span>' + esc(who) + 'の予定がまだ決まっていない日です。</span>');
     else {
       var pres = m ? (day.byMentor[mid] || []) : day.presence;
       parts.push(pres.length ? 'この日の' + esc(who) + '：' + pres.map(function(p){ return p[0] + '〜' + p[1]; }).join('、') : '<span class="warn">この日は' + esc(who) + 'の予定がまだありません</span>');
       if (t) {
         var s = mins(t), e = s + D.lessonMin;
         var ok = pres.some(function(p){ return mins(p[0]) <= s && mins(p[1]) >= e; });
-        if (pres.length) parts.push(ok ? '<span class="ok">' + esc(who) + 'がいる時間です</span>' : '<span class="warn">' + esc(who) + 'がいない時間を含みます（相談になります）</span>');
+        if (pres.length) parts.push(ok ? '<span class="ok">' + esc(who) + 'がいる時間です</span>' : '<span class="warn">' + esc(who) + 'がいない時間を含みます（この時間では依頼できません）</span>');
+        if (ok && slotClash(day, m ? mid : '', s, e)) parts.push('<span class="warn">ほかの生徒の授業と重なっています（調整が必要です）</span>');
         day.events.forEach(function(ev){ if (mins(ev.start) < e && s < mins(ev.end)) parts.push('<span class="warn">「' + esc(ev.name) + '」（' + ev.start + '〜' + ev.end + '）と重なります</span>'); });
       }
     }
@@ -425,6 +436,15 @@ function renderNow(n){
       if (d && t) slots.push({ date: d, start: t });
     }
     if (!slots.length) { err.textContent = '第1希望の日時を選んでください'; return; }
+    var fmid = document.getElementById('fMentor').value, clash = false;
+    for (var k = 0; k < slots.length; k++) {
+      var sd = D.days.filter(function(x){ return x.date === slots[k].date; })[0];
+      if (!sd) continue;
+      var ss = mins(slots[k].start), se = ss + D.lessonMin;
+      if (!slotCover(sd, fmid, ss, se).length) { err.textContent = '第' + (k+1) + '希望は、' + (fmid ? '選んだメンター' : 'メンター') + 'の在室予定の時間外のため依頼できません。在室予定の時間内で選んでください。'; return; }
+      if (slotClash(sd, fmid, ss, se)) clash = true;
+    }
+    if (clash && !confirm('他の生徒の授業との調整が必要なので、厳しいかもしれません。それでも依頼を出しますか？')) return;
     err.textContent = '';
     var btn = this; btn.disabled = true; btn.textContent = '送信中…';
     api(editId ? 'req_resubmit' : 'req_create', { id: editId, studentId: cur, slots: slots, mentorId: document.getElementById('fMentor').value, content: document.getElementById('fContent').value, with: document.getElementById('fWith').value, memo: document.getElementById('fMemo').value })
