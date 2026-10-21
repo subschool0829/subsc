@@ -65,7 +65,8 @@
   .start p{color:#c9d4e6;font-size:clamp(14px,1.8vw,20px);line-height:1.7;max-width:40em}
   @media (prefers-reduced-motion:reduce){*{animation:none!important}}
   /* おうちの人へのメッセージ */
-  .msgbtn{margin-top:4vh;font:inherit;font-weight:900;font-size:clamp(16px,2.2vw,26px);color:var(--ink);background:#fff;border:3px solid var(--ink);border-radius:999px;padding:1.4vh 3vw;cursor:pointer}
+  .msgbtns{display:flex;flex-wrap:wrap;gap:1.2vw;margin-top:4vh}
+  .msgbtn{margin-top:0;font:inherit;font-weight:900;font-size:clamp(14px,1.8vw,22px);color:var(--ink);background:#fff;border:3px solid var(--ink);border-radius:999px;padding:1.3vh 2.2vw;cursor:pointer}
   .msgbtn:active{transform:translateY(2px)}
   .msgbar{position:fixed;left:0;right:0;top:0;display:none;align-items:center;justify-content:center;gap:3vw;background:#2F6FDB;color:#fff;padding:2.4vh 4vw;font-weight:900;font-size:clamp(20px,3vw,38px);z-index:20}
   .msgbar.show{display:flex}
@@ -93,12 +94,12 @@
     <div class="clock" id="clock">--:--</div>
     <div class="date" id="date"></div>
     <div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div>
-    <button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button>
+    <div class="msgbtns"><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button></div>
   </div>
 </div>
 <div class="brand">みんなのサブスク</div>
 
-<div class="msgbar" id="msgBar"><span>メッセージを送る人のQRコードをかざしてね</span><button type="button" id="msgBarCancel">キャンセル</button></div>
+<div class="msgbar" id="msgBar"><span id="msgBarText">メッセージを送る人のQRコードをかざしてね</span><button type="button" id="msgBarCancel">キャンセル</button></div>
 
 <div class="compose" id="compose">
   <h2 id="cTitle"></h2>
@@ -369,10 +370,11 @@ function onCode(text){
   }
 
   // ===== おうちの人へのメッセージ =====
-  var msgMode = false, msgTimer = null, msgQr = '', msgName = '';
-  function msgStart(){
+  var msgMode = false, msgTimer = null, msgQr = '', msgName = '', msgTo = 'family';
+  function msgStart(to){
     if (busy) return;
-    msgMode = true; lastText = '';
+    msgMode = true; lastText = ''; msgTo = to === 'seiwa' ? 'seiwa' : 'family';
+    document.getElementById('msgBarText').textContent = (msgTo === 'seiwa' ? 'Seiwaに' : 'おうちの人に') + 'メッセージを送る人のQRコードをかざしてね';
     document.getElementById('msgBar').classList.add('show');
     clearTimeout(msgTimer); msgTimer = setTimeout(msgEnd, 30000);
   }
@@ -393,7 +395,7 @@ function onCode(text){
     busy = true; beep(880, .12);
     var ent = ROSTER && ROSTER.s ? ROSTER.s[id] : null;
     msgQr = text; msgName = ent ? ent.name : '';
-    document.getElementById('cTitle').textContent = (msgName ? msgName + 'さん' : 'このカードの生徒') + 'から、おうちの人にメッセージを送ります';
+    document.getElementById('cTitle').textContent = (msgName ? msgName + 'さん' : 'このカードの生徒') + (msgTo === 'seiwa' ? 'から、Seiwaにメッセージを送ります' : 'から、おうちの人にメッセージを送ります');
     var ta = document.getElementById('cText');
     ta.value = ''; msgCount();
     document.getElementById('compose').classList.add('show');
@@ -413,15 +415,15 @@ function onCode(text){
   function msgSend(){
     var body = document.getElementById('cText').value.trim();
     if (!body) return;
-    var qr = msgQr, name = msgName;
+    var qr = msgQr, name = msgName, to = msgTo;
     msgClose();
     show('wait', '送信中…', '', '', '', true);
-    fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_msg', key:KEY, qr:qr, text:body }) })
+    fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_msg', key:KEY, qr:qr, text:body, to:to }) })
       .then(function(r){ return r.json(); })
       .then(function(r){
         if (r && r.ok) {
           chime(true);
-          show('in', '送りました', (r.name || name) + 'さん', r.noParent ? '教室の先生に届けました' : 'おうちの人に届けました', r.noParent ? '※おうちの人のLINE登録がまだのため、先生だけに届いています' : '');
+          show('in', '送りました', (r.name || name) + 'さん', to === 'seiwa' ? 'Seiwaに届けました' : (r.noParent ? '教室の先生に届けました' : 'おうちの人に届けました'), r.noParent ? '※おうちの人のLINE登録がまだのため、先生だけに届いています' : '');
         } else {
           beep(220, .3);
           show('err', (r && r.message) || '送れませんでした', '', '先生に声をかけてください', '');
@@ -434,7 +436,8 @@ function onCode(text){
         lastText = ''; setTimeout(reset, 3000);
       });
   }
-  document.getElementById('msgBtn').onclick = msgStart;
+  document.getElementById('msgBtn').onclick = function(){ msgStart('family'); };
+  document.getElementById('msgBtnS').onclick = function(){ msgStart('seiwa'); };
   document.getElementById('msgBarCancel').onclick = msgEnd;
   document.getElementById('cCancel').onclick = msgCancel;
   document.getElementById('cSend').onclick = msgSend;
