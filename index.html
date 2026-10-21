@@ -64,6 +64,22 @@
   .start button:focus-visible{outline:4px solid #8fc1ff;outline-offset:4px}
   .start p{color:#c9d4e6;font-size:clamp(14px,1.8vw,20px);line-height:1.7;max-width:40em}
   @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+  /* おうちの人へのメッセージ */
+  .msgbtn{margin-top:4vh;font:inherit;font-weight:900;font-size:clamp(16px,2.2vw,26px);color:var(--ink);background:#fff;border:3px solid var(--ink);border-radius:999px;padding:1.4vh 3vw;cursor:pointer}
+  .msgbtn:active{transform:translateY(2px)}
+  .msgbar{position:fixed;left:0;right:0;top:0;display:none;align-items:center;justify-content:center;gap:3vw;background:#2F6FDB;color:#fff;padding:2.4vh 4vw;font-weight:900;font-size:clamp(20px,3vw,38px);z-index:20}
+  .msgbar.show{display:flex}
+  .msgbar button,.compose button{font:inherit;font-weight:900;border:0;border-radius:999px;cursor:pointer}
+  .msgbar button{font-size:clamp(14px,1.8vw,22px);padding:1vh 2.6vw;background:#fff;color:#2F6FDB}
+  .compose{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:flex-start;background:var(--paper);padding:4vh 5vw;z-index:30;gap:2vh}
+  .compose.show{display:flex}
+  .compose h2{font-size:clamp(22px,3.4vw,42px);font-weight:900;text-align:center;line-height:1.4}
+  .compose textarea{width:100%;max-width:900px;height:28vh;font:inherit;font-size:clamp(18px,2.4vw,28px);font-weight:700;padding:2vh 2vw;border:3px solid var(--ink);border-radius:20px;resize:none;background:#fff;color:var(--ink)}
+  .compose .row{display:flex;gap:3vw;width:100%;max-width:900px;justify-content:flex-end;align-items:center}
+  .compose .cnt{margin-right:auto;color:var(--sub);font-weight:700;font-size:clamp(14px,1.6vw,20px)}
+  .compose .send{font-size:clamp(20px,2.6vw,32px);padding:1.6vh 5vw;background:#2F6FDB;color:#fff}
+  .compose .send:disabled{opacity:.4}
+  .compose .cancel{font-size:clamp(18px,2.2vw,26px);padding:1.6vh 3.5vw;background:#fff;color:var(--ink);border:3px solid var(--ink)}
 </style>
 </head>
 <body>
@@ -77,9 +93,22 @@
     <div class="clock" id="clock">--:--</div>
     <div class="date" id="date"></div>
     <div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div>
+    <button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button>
   </div>
 </div>
 <div class="brand">みんなのサブスク</div>
+
+<div class="msgbar" id="msgBar"><span>メッセージを送る人のQRコードをかざしてね</span><button type="button" id="msgBarCancel">キャンセル</button></div>
+
+<div class="compose" id="compose">
+  <h2 id="cTitle"></h2>
+  <textarea id="cText" maxlength="300" placeholder="ここにメッセージを書いてね"></textarea>
+  <div class="row">
+    <span class="cnt" id="cCount">0 / 300</span>
+    <button type="button" class="cancel" id="cCancel">キャンセル</button>
+    <button type="button" class="send" id="cSend" disabled>送信</button>
+  </div>
+</div>
 
 <div class="overlay" id="overlay">
   <div class="count" id="spinner" hidden></div>
@@ -237,6 +266,7 @@ function sendBg(text, photo, ent, act, tries){
 
 function onCode(text){
     if (busy) return;
+    if (msgMode) { msgCode(text); return; }
     var now = Date.now();
     if (text === lastText && now - lastTime < 6000) return;
     lastText = text; lastTime = now;
@@ -337,6 +367,78 @@ function onCode(text){
     document.getElementById('overlay').className = 'overlay';
     busy = false;
   }
+
+  // ===== おうちの人へのメッセージ =====
+  var msgMode = false, msgTimer = null, msgQr = '', msgName = '';
+  function msgStart(){
+    if (busy) return;
+    msgMode = true; lastText = '';
+    document.getElementById('msgBar').classList.add('show');
+    clearTimeout(msgTimer); msgTimer = setTimeout(msgEnd, 30000);
+  }
+  function msgEnd(){
+    msgMode = false; clearTimeout(msgTimer);
+    document.getElementById('msgBar').classList.remove('show');
+  }
+  function msgCode(text){
+    var id = text.indexOf('SUBSC:') === 0 ? text.slice(6).trim() : '';
+    if (!/^S\d+$/.test(id)) {
+      busy = true; beep(220, .25);
+      show('err', 'このカードでは送れません', '', '生徒のQRカードをかざしてね', '');
+      setTimeout(reset, 2500);
+      return;
+    }
+    clearTimeout(msgTimer);
+    document.getElementById('msgBar').classList.remove('show');
+    busy = true; beep(880, .12);
+    var ent = ROSTER && ROSTER.s ? ROSTER.s[id] : null;
+    msgQr = text; msgName = ent ? ent.name : '';
+    document.getElementById('cTitle').textContent = (msgName ? msgName + 'さん' : 'このカードの生徒') + 'から、おうちの人にメッセージを送ります';
+    var ta = document.getElementById('cText');
+    ta.value = ''; msgCount();
+    document.getElementById('compose').classList.add('show');
+    setTimeout(function(){ ta.focus(); }, 100);
+  }
+  function msgCount(){
+    var v = document.getElementById('cText').value;
+    document.getElementById('cCount').textContent = v.length + ' / 300';
+    document.getElementById('cSend').disabled = !v.trim();
+  }
+  function msgClose(){
+    document.getElementById('compose').classList.remove('show');
+    document.getElementById('cText').blur();
+    msgEnd(); msgQr = ''; msgName = '';
+  }
+  function msgCancel(){ msgClose(); lastText = ''; reset(); }
+  function msgSend(){
+    var body = document.getElementById('cText').value.trim();
+    if (!body) return;
+    var qr = msgQr, name = msgName;
+    msgClose();
+    show('wait', '送信中…', '', '', '', true);
+    fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_msg', key:KEY, qr:qr, text:body }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        if (r && r.ok) {
+          chime(true);
+          show('in', '送りました', (r.name || name) + 'さん', r.noParent ? '教室の先生に届けました' : 'おうちの人に届けました', r.noParent ? '※おうちの人のLINE登録がまだのため、先生だけに届いています' : '');
+        } else {
+          beep(220, .3);
+          show('err', (r && r.message) || '送れませんでした', '', '先生に声をかけてください', '');
+        }
+        lastText = ''; setTimeout(reset, 3500);
+      })
+      .catch(function(){
+        beep(220, .3);
+        show('err', '通信できませんでした', '', 'もう一度ためしてください', '');
+        lastText = ''; setTimeout(reset, 3000);
+      });
+  }
+  document.getElementById('msgBtn').onclick = msgStart;
+  document.getElementById('msgBarCancel').onclick = msgEnd;
+  document.getElementById('cCancel').onclick = msgCancel;
+  document.getElementById('cSend').onclick = msgSend;
+  document.getElementById('cText').addEventListener('input', msgCount);
 
   // 効果音
   var actx = null;
