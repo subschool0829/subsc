@@ -168,6 +168,19 @@
     <div class="row"><h2>行事（講座・勉強会など）</h2><button class="btn yel" id="addEventBtn">＋ 追加</button></div>
     <p class="muted" style="margin-bottom:10px">毎週の行事は一度登録すれば、毎週の予定に表示されます。特定の日だけ休みにするときは、週の予定でその日の行事をタップしてください。</p>
     <div id="eventList"></div>
+
+    <div class="row" style="margin-top:28px"><h2>受付画面の表示</h2></div>
+    <p class="muted" style="margin-bottom:10px">教室のタブレットの受付画面に表示します。保存すると5分以内に反映されます。</p>
+    <div class="card" id="boardCard">
+      <label style="display:block;font-weight:700;margin-bottom:6px">教室からのメッセージ</label>
+      <textarea id="bdMsg" maxlength="200" rows="3" placeholder="例：今週の金曜日は18時から勉強会があります" style="width:100%;font:inherit;padding:10px;border:1px solid #ccc;border-radius:10px;box-sizing:border-box"></textarea>
+      <p class="muted" style="margin:4px 0 14px">空にすると表示しません（200字まで）</p>
+      <label style="display:block;font-weight:700;margin-bottom:6px">カウントダウン（〇〇まであと△日）</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><input id="bdL1" maxlength="20" placeholder="例：中間テスト" style="flex:1 1 160px;font:inherit;padding:10px;border:1px solid #ccc;border-radius:10px"><input id="bdD1" type="date" style="flex:0 0 auto;font:inherit;padding:9px;border:1px solid #ccc;border-radius:10px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="bdL2" maxlength="20" placeholder="例：共通テスト" style="flex:1 1 160px;font:inherit;padding:10px;border:1px solid #ccc;border-radius:10px"><input id="bdD2" type="date" style="flex:0 0 auto;font:inherit;padding:9px;border:1px solid #ccc;border-radius:10px"></div>
+      <p class="muted" style="margin:4px 0 14px">名前と日付を両方入れると表示します。当日が「あと0日」になり、日付を過ぎると表示されなくなります。</p>
+      <div class="row" style="justify-content:space-between;align-items:center"><span class="muted" id="bdInfo"></span><button class="btn yel" id="bdSave" data-label="保存">保存</button></div>
+    </div>
   </section>
 
   <section class="panel" id="p-meal">
@@ -1567,11 +1580,35 @@
   }
 
   // ===== タブ =====
+  // ----- 受付画面の表示（教室からのメッセージ・カウントダウン） -----
+  function loadBoard(){
+    document.getElementById('bdInfo').textContent = '読み込み中…';
+    api('sch_board_get').then(function(r){
+      document.getElementById('bdMsg').value = r.message || '';
+      ['1', '2'].forEach(function(n, i){
+        var c = (r.cd || [])[i] || {};
+        document.getElementById('bdL' + n).value = c.label || '';
+        document.getElementById('bdD' + n).value = c.date || '';
+      });
+      document.getElementById('bdInfo').textContent = r.updated ? '最終更新 ' + r.updated + (r.by ? '（' + r.by + '）' : '') : '';
+    }).catch(function(e){ document.getElementById('bdInfo').textContent = ''; toast(e.message); });
+  }
+  document.getElementById('bdSave').addEventListener('click', function(){
+    var btn = this;
+    var data = { message: document.getElementById('bdMsg').value, cd: ['1', '2'].map(function(n){ return { label: document.getElementById('bdL' + n).value, date: document.getElementById('bdD' + n).value }; }) };
+    btn.disabled = true; btn.textContent = '保存中…';
+    api('sch_board_save', data).then(function(r){
+      toast('受付画面の表示を保存しました');
+      document.getElementById('bdInfo').textContent = r.updated ? '最終更新 ' + r.updated + (r.by ? '（' + r.by + '）' : '') : '';
+    }).catch(function(e){ toast(e.message); }).then(function(){ btn.disabled = false; btn.textContent = '保存'; });
+  });
+
   function showPanel(p){
     [].forEach.call(document.querySelectorAll('.panel'), function(el){ el.classList.toggle('on', el.id === 'p-' + p); });
     [].forEach.call(document.querySelectorAll('#tabbar button'), function(b){ if (b.dataset.p === p) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     window.scrollTo(0, 0);
     if (p === 'room') loadRoom();
+    if (p === 'events') loadBoard();
   }
   document.getElementById('tabbar').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if (b) showPanel(b.dataset.p); });
 

@@ -81,6 +81,18 @@
   .compose .send{font-size:clamp(20px,2.6vw,32px);padding:1.6vh 5vw;background:#2F6FDB;color:#fff}
   .compose .send:disabled{opacity:.4}
   .compose .cancel{font-size:clamp(18px,2.2vw,26px);padding:1.6vh 3.5vw;background:#fff;color:var(--ink);border:3px solid var(--ink)}
+  /* 教室からのメッセージ・カウントダウン */
+  .guiderow{display:flex;gap:2.4vw;align-items:center;margin-top:4vh}
+  .guiderow .guide{margin-top:0}
+  .cds{display:flex;flex-direction:column;gap:1.2vh;min-width:0}
+  .cds:empty{display:none}
+  .cd{background:#fff;border:3px solid var(--ink);border-radius:18px;padding:1vh 1.4vw;line-height:1.25}
+  .cd .lb{display:block;font-size:clamp(12px,1.5vw,20px);font-weight:700;color:var(--sub)}
+  .cd .dd{font-size:clamp(14px,1.7vw,22px);font-weight:900;white-space:nowrap}
+  .cd .dd b{font-size:clamp(26px,3.6vw,48px);font-weight:900;margin:0 .15em;color:#2F6FDB}
+  .board{margin-top:2.6vh;background:#FFF5CC;border-left:8px solid #F7CE2E;border-radius:14px;padding:1.4vh 1.6vw;font-weight:700;font-size:clamp(15px,1.9vw,24px);line-height:1.5;white-space:pre-wrap;max-height:22vh;overflow:hidden}
+  .board small{display:block;font-size:.7em;color:var(--sub);margin-bottom:.3vh}
+  .board[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -93,7 +105,8 @@
   <div class="side">
     <div class="clock" id="clock">--:--</div>
     <div class="date" id="date"></div>
-    <div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div>
+    <div class="guiderow"><div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div><div class="cds" id="cds"></div></div>
+    <div class="board" id="board" hidden><small>教室からのメッセージ</small><span id="boardText"></span></div>
     <div class="msgbtns"><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
   </div>
 </div>
@@ -444,6 +457,36 @@ function onCode(text){
   document.getElementById('cCancel').onclick = msgCancel;
   document.getElementById('cSend').onclick = msgSend;
   document.getElementById('cText').addEventListener('input', msgCount);
+
+  // ===== 教室からのメッセージ・カウントダウン =====
+  var BOARD = null;
+  function loadBoard(){
+    if (!KEY) return;
+    fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_board', key:KEY }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){ if (r && r.ok) { BOARD = r; renderBoard(); } })
+      .catch(function(){});
+  }
+  function renderBoard(){
+    if (!BOARD) return;
+    var bd = document.getElementById('board');
+    document.getElementById('boardText').textContent = BOARD.message || '';
+    bd.hidden = !BOARD.message;
+    var now = new Date(), today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    var html = '';
+    (BOARD.cd || []).forEach(function(c){
+      if (!c || !c.label || !/^\d{4}-\d{2}-\d{2}$/.test(c.date)) return;
+      var p = c.date.split('-').map(Number);
+      var days = Math.round((Date.UTC(p[0], p[1] - 1, p[2]) - today) / 86400000);
+      if (days < 0) return;
+      var e = document.createElement('div'); e.textContent = c.label;
+      html += '<div class="cd"><span class="lb">' + e.innerHTML + 'まで</span><span class="dd">あと<b>' + days + '</b>日</span></div>';
+    });
+    document.getElementById('cds').innerHTML = html;
+  }
+  loadBoard();
+  setInterval(loadBoard, 5 * 60 * 1000);
+  setInterval(renderBoard, 60 * 1000);
 
   // 効果音
   var actx = null;
