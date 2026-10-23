@@ -99,7 +99,10 @@
   .guiderow .guide{font-size:clamp(20px,2.7vw,38px);white-space:nowrap}
   .guiderow .guide small{white-space:normal}
   .cd .lb{white-space:nowrap}
-  .board{margin-top:2vh;font-size:clamp(14px,1.6vw,21px);max-height:18vh}
+  .toprow{display:flex;gap:2vw;align-items:stretch}
+  .toprow .clk{flex:none}
+  .board{margin-top:0;flex:1 1 auto;min-width:0;height:clamp(90px,17vh,150px);font-size:clamp(13px,1.45vw,19px);line-height:1.45;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+  .board.none span{color:var(--sub);font-weight:500}
   .msgbtns{margin-top:2.2vh}
 </style>
 </head>
@@ -111,10 +114,10 @@
     <div class="flash" id="flash"></div>
   </div>
   <div class="side">
-    <div class="clock" id="clock">--:--</div>
-    <div class="date" id="date"></div>
+    <div class="toprow"><div class="clk"><div class="clock" id="clock">--:--</div>
+    <div class="date" id="date"></div></div>
+    <div class="board" id="board"><small>教室からのメッセージ</small><span id="boardText">本日は特別なメッセージはありません</span></div></div>
     <div class="guiderow"><div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div><div class="cds" id="cds"></div></div>
-    <div class="board" id="board" hidden><small>教室からのメッセージ</small><span id="boardText"></span></div>
     <div class="msgbtns"><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
   </div>
 </div>
@@ -478,8 +481,8 @@ function onCode(text){
   function renderBoard(){
     if (!BOARD) return;
     var bd = document.getElementById('board');
-    document.getElementById('boardText').textContent = BOARD.message || '';
-    bd.hidden = !BOARD.message;
+    document.getElementById('boardText').textContent = BOARD.message || '本日は特別なメッセージはありません';
+    bd.classList.toggle('none', !BOARD.message);
     var now = new Date(), today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
     var html = '';
     (BOARD.cd || []).forEach(function(c){
