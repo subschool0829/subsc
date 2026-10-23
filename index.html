@@ -94,7 +94,7 @@
     <div class="clock" id="clock">--:--</div>
     <div class="date" id="date"></div>
     <div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div>
-    <div class="msgbtns"><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button></div>
+    <div class="msgbtns"><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
   </div>
 </div>
 <div class="brand">みんなのサブスク</div>
@@ -374,8 +374,8 @@ function onCode(text){
   var msgMode = false, msgTimer = null, msgQr = '', msgName = '', msgTo = 'family';
   function msgStart(to){
     if (busy) return;
-    msgMode = true; lastText = ''; msgTo = to === 'seiwa' ? 'seiwa' : 'family';
-    document.getElementById('msgBarText').textContent = (msgTo === 'seiwa' ? 'Seiwaに' : 'おうちの人に') + 'メッセージを送る人のQRコードをかざしてね';
+    msgMode = true; lastText = ''; msgTo = (to === 'seiwa' || to === 'kento') ? to : 'family';
+    document.getElementById('msgBarText').textContent = (msgTo === 'seiwa' ? 'Seiwaに' : msgTo === 'kento' ? 'Kentoに' : 'おうちの人に') + 'メッセージを送る人のQRコードをかざしてね';
     document.getElementById('msgBar').classList.add('show');
     clearTimeout(msgTimer); msgTimer = setTimeout(msgEnd, 30000);
   }
@@ -396,7 +396,7 @@ function onCode(text){
     busy = true; beep(880, .12);
     var ent = ROSTER && ROSTER.s ? ROSTER.s[id] : null;
     msgQr = text; msgName = ent ? ent.name : '';
-    document.getElementById('cTitle').textContent = (msgName ? msgName + 'さん' : 'このカードの生徒') + (msgTo === 'seiwa' ? 'から、Seiwaにメッセージを送ります' : 'から、おうちの人にメッセージを送ります');
+    document.getElementById('cTitle').textContent = (msgName ? msgName + 'さん' : 'このカードの生徒') + (msgTo === 'seiwa' ? 'から、Seiwaにメッセージを送ります' : msgTo === 'kento' ? 'から、Kentoにメッセージを送ります' : 'から、おうちの人にメッセージを送ります');
     var ta = document.getElementById('cText');
     ta.value = ''; msgCount();
     document.getElementById('compose').classList.add('show');
@@ -424,7 +424,7 @@ function onCode(text){
       .then(function(r){
         if (r && r.ok) {
           chime(true);
-          show('in', '送りました', (r.name || name) + 'さん', to === 'seiwa' ? 'Seiwaに届けました' : (r.noParent ? '教室の先生に届けました' : 'おうちの人に届けました'), r.noParent ? '※おうちの人のLINE登録がまだのため、先生だけに届いています' : '');
+          show('in', '送りました', (r.name || name) + 'さん', to === 'seiwa' ? 'Seiwaに届けました' : to === 'kento' ? 'Kentoに届けました' : (r.noParent ? '教室の先生に届けました' : 'おうちの人に届けました'), r.noParent ? '※おうちの人のLINE登録がまだのため、先生だけに届いています' : '');
         } else {
           beep(220, .3);
           show('err', (r && r.message) || '送れませんでした', '', '先生に声をかけてください', '');
@@ -439,6 +439,7 @@ function onCode(text){
   }
   document.getElementById('msgBtn').onclick = function(){ msgStart('family'); };
   document.getElementById('msgBtnS').onclick = function(){ msgStart('seiwa'); };
+  document.getElementById('msgBtnK').onclick = function(){ msgStart('kento'); };
   document.getElementById('msgBarCancel').onclick = msgEnd;
   document.getElementById('cCancel').onclick = msgCancel;
   document.getElementById('cSend').onclick = msgSend;
