@@ -458,7 +458,7 @@
         var warn = !e.off && e.mentorId && !covers(D.shifts.filter(function(s){ return s.date === e.date && s.mentorId === e.mentorId; }).map(function(s){ return [s.start, s.end]; }), e.start, e.end);
         return '<button class="tlev' + (e.off ? ' off' : '') + (warn ? ' warnb' : '') + '" data-event="' + e.id + '" data-date="' + e.date + '" style="' + pos(e.start, e.end) + '" title="' + esc(evText(e)) + '">' + esc(evText(e)) + '</button>';
       };
-      var rows = D.mentors.map(function(m){ return { id: m.id, name: m.name }; });
+      var rows = D.mentors.filter(function(m){ return !isFreeM(m); }).map(function(m){ return { id: m.id, name: m.name }; }); // free は週の予定に表示しない
       if (lessonsDay.some(function(l){ return !l.mentorId; })) rows.push({ id: '', name: '担当未定' });
       rows.forEach(function(m){
         html += '<div class="tlrow"><div class="tlname' + (m.id && !D.shifts.some(function(s){ return s.date === d && s.mentorId === m.id; }) ? ' off' : '') + '">' + esc(m.name) + '</div><div class="tltrack" data-track="1" data-date="' + d + '" data-mentor="' + m.id + '" data-t0="' + T0 + '" data-span="' + span + '">';
@@ -648,7 +648,7 @@
     s = s || { date: d, start: '16:00', end: '22:00', mentorId: D.me.id, memo: '' };
     fRep = 'none';
     var mentorSel = D.me.admin
-      ? '<label class="f">メンター<select id="fM">' + D.mentors.map(function(m){ return '<option value="' + m.id + '"' + (m.id === s.mentorId ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>'
+      ? '<label class="f">メンター<select id="fM">' + D.mentors.filter(function(m){ return !isFreeM(m); }).map(function(m){ return '<option value="' + m.id + '"' + (m.id === s.mentorId ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('') + '</select></label>'
       : '<p class="muted" style="margin-top:8px">' + esc(D.me.name) + 'さんの予定</p>';
     openModal('<h3>在室予定' + (isNew ? 'を追加' : '') + '</h3>' + mentorSel
       + '<label class="f">' + (isNew ? '日付（くり返す場合は開始日）' : '日付') + '<input type="date" id="fD" value="' + s.date + '"></label>'
@@ -842,7 +842,7 @@
       document.getElementById('qrName').textContent = D.me.name + '（' + D.me.id + '）';
       qrDone = true;
     }
-    document.getElementById('attList').innerHTML = D.mentors.map(function(m){
+    document.getElementById('attList').innerHTML = D.mentors.filter(function(m){ return !isFreeM(m); }).map(function(m){
       var a = D.attendance[m.id];
       var st = !a || !a.used ? '<span class="muted">QR未使用</span>' : a.in ? '<span class="on-badge">出勤中（' + a.since + '〜）</span>' : a.since ? '<span class="muted">退勤（' + a.since + '）</span>' : '<span class="muted">未出勤</span>';
       return '<div class="att"><b>' + esc(m.name) + '</b>' + st + '</div>';
@@ -1600,6 +1600,7 @@
     }).catch(function(e){ toast(e.message); }).then(function(){ btn.disabled = false; btn.textContent = '保存'; });
   });
 
+  function isFreeM(m){ return !!m && String(m.name).trim().toLowerCase() === 'free'; }
   function showPanel(p){
     [].forEach.call(document.querySelectorAll('.panel'), function(el){ el.classList.toggle('on', el.id === 'p-' + p); });
     [].forEach.call(document.querySelectorAll('#tabbar button'), function(b){ if (b.dataset.p === p) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });

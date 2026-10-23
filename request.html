@@ -371,7 +371,7 @@ function renderNow(n){
     if (D.openFrom && D.today < D.openFrom) { toast('授業の申し込みは' + label(D.openFrom) + 'から受け付けます'); return; }
     var st = D.students.filter(function(s){ return s.id === cur; })[0];
     document.getElementById('formWho').innerHTML = '<p><b>' + esc(st.name) + 'さん</b>の授業を申し込みます。</p>'
-      + '<label class="f">希望のメンター <small>（任意）</small><select id="fMentor"><option value="">指定なし</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '">' + esc(m.name) + 'さん</option>'; }).join('') + '</select></label><p class="hint" id="fixNote"></p>';
+      + '<label class="f">希望のメンター <small>（任意）</small><select id="fMentor"><option value="">指定なし</option>' + D.mentors.map(function(m){ return '<option value="' + m.id + '">' + (isFreeM(m) ? 'free（在室予定に関係なく依頼）' : esc(m.name) + 'さん') + '</option>'; }).join('') + '</select></label><p class="hint" id="fixNote"></p>';
     var max = D.days[D.days.length - 1].date;
     var h = '';
     for (var i = 0; i < 3; i++) {
@@ -403,6 +403,7 @@ function renderNow(n){
     var c = slotCover(day, mid, s, e), bz = day.busy || {};
     return c.length > 0 && c.every(function(id){ return (bz[id] || []).some(function(b){ return mins(b[0]) < e && s < mins(b[1]); }); });
   }
+  function isFreeM(m){ return !!m && String(m.name).trim().toLowerCase() === 'free'; }
   function hint(i){
     var d = document.getElementById('d' + i).value, t = document.getElementById('t' + i).value, el = document.getElementById('h' + i);
     if (!d) { el.innerHTML = ''; return; }
@@ -410,6 +411,7 @@ function renderNow(n){
     var mid = document.getElementById('fMentor').value;
     var m = D.mentors.filter(function(x){ return x.id === mid; })[0];
     var who = m ? m.name + 'さん' : 'メンター';
+    if (isFreeM(m)) { el.innerHTML = '<span class="ok">「free」は在室予定に関係なく、好きな日時で依頼できます。日時はあとで調整してお返事します。</span>'; return; }
     var parts = [];
     if (!day) parts.push('<span>' + esc(who) + 'の予定がまだ決まっていない日です。</span>');
     else {
