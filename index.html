@@ -287,7 +287,8 @@ function onCode(text){
         setTimeout(reset, 2500);
         return;
       }
-      var act = ent.in ? '退室' : '入室';
+      var nd = new Date(), late = nd.getHours() * 100 + nd.getMinutes() >= 2330;
+      var act = (ent.in || (!isM && late)) ? '退室' : '入室'; // 23:30以降、生徒は退室として記録
       var done = function(photo){
         ent.in = act === '入室'; ent.last = Date.now(); ent.touched = Date.now();
         if (isM) {
