@@ -129,6 +129,11 @@
   .gbar b{font-size:clamp(20px,3vw,38px);font-weight:900}
   .gbar span{font-size:clamp(14px,1.8vw,22px);font-weight:700;opacity:.9}
   .gbar button{font:inherit;font-weight:900;border:0;border-radius:999px;cursor:pointer;font-size:clamp(14px,1.8vw,22px);padding:.8vh 2.6vw;background:#fff;color:#1B2B4B;margin-top:.6vh}
+
+  /* layout fix 2026-10-25 */
+  .board{justify-content:safe center;height:clamp(100px,24vh,200px)}
+  .cam{width:min(100%,82vh)}
+  @media (orientation:portrait){.wrap{gap:2vh;padding:2.5vh 5vw 5vh}.cam{width:min(100%,40vh);max-height:40vh}.guide{margin-top:2vh}.board{height:clamp(80px,14vh,170px)}}
 </style>
 </head>
 <body>
@@ -606,11 +611,18 @@ function onCode(text){
       .then(function(r){ if (r && r.ok) { BOARD = r; renderBoard(); } })
       .catch(function(){});
   }
+  function fitBoard(){
+    var b = document.getElementById('board'); if (!b) return;
+    b.style.fontSize = '';
+    var f = parseFloat(getComputedStyle(b).fontSize), n = 0;
+    while (b.scrollHeight > b.clientHeight + 1 && f > 12 && n < 30) { f -= 1; b.style.fontSize = f + 'px'; n++; }
+  }
+  window.addEventListener('resize', function(){ try { fitBoard(); } catch(e){} });
   function renderBoard(){
     if (!BOARD) return;
     var bd = document.getElementById('board');
     document.getElementById('boardText').textContent = BOARD.message || '本日は特別なメッセージはありません';
-    bd.classList.toggle('none', !BOARD.message);
+    bd.classList.toggle('none', !BOARD.message); fitBoard();
     var now = new Date(), today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
     var html = '';
     (BOARD.cd || []).forEach(function(c){
