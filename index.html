@@ -104,6 +104,31 @@
   .board{margin-top:0;flex:1 1 auto;min-width:0;height:clamp(90px,17vh,150px);font-size:clamp(13px,1.45vw,19px);line-height:1.45;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
   .board.none span{color:var(--sub);font-weight:500}
   .msgbtns{margin-top:2.2vh}
+  /* ゲストの入退室 */
+  .msgbtn.guest{background:#1B2B4B;color:#fff;border-color:#1B2B4B}
+  .gpanel{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:flex-start;background:var(--paper);padding:4vh 5vw;z-index:30;gap:2.4vh;overflow:auto}
+  .gpanel.show{display:flex}
+  .gpanel h2{font-size:clamp(22px,3.4vw,42px);font-weight:900;text-align:center;line-height:1.4}
+  .gpanel .gnote{font-size:clamp(14px,1.8vw,22px);font-weight:700;color:var(--sub);text-align:center}
+  .gpanel .ggrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2vw;width:100%;max-width:900px}
+  .gpanel .ggrid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gpanel .ggrid button,.gpanel .gbig{font:inherit;font-weight:900;font-size:clamp(20px,2.8vw,34px);padding:3vh 1vw;border-radius:22px;border:3px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer}
+  .gpanel .ggrid button.in{background:var(--in);border-color:var(--in);color:#fff}
+  .gpanel .ggrid button.out{background:var(--out);border-color:var(--out);color:#fff}
+  .gpanel .glist{display:flex;flex-direction:column;gap:1.4vh;width:100%;max-width:900px}
+  .gpanel .glist button{font:inherit;font-weight:900;font-size:clamp(18px,2.4vw,30px);padding:2vh 2vw;border-radius:18px;border:3px solid var(--ink);background:#fff;color:var(--ink);text-align:left;cursor:pointer}
+  .gpanel .glist button small{font-size:.6em;color:var(--sub);margin-left:1em}
+  .gpanel input{width:100%;max-width:900px;font:inherit;font-size:clamp(22px,3vw,36px);font-weight:700;padding:2vh 2vw;border:3px solid var(--ink);border-radius:20px;background:#fff;color:var(--ink);box-sizing:border-box}
+  .gpanel .row{display:flex;gap:3vw;width:100%;max-width:900px;justify-content:flex-end;align-items:center}
+  .gpanel .row button{font:inherit;font-weight:900;border-radius:999px;cursor:pointer;font-size:clamp(18px,2.2vw,26px);padding:1.6vh 3.5vw;background:#fff;color:var(--ink);border:3px solid var(--ink)}
+  .gpanel .row button.next{background:#2F6FDB;color:#fff;border-color:#2F6FDB}
+  .gpanel .row button:disabled{opacity:.4}
+  .gbar{position:fixed;left:0;right:0;top:0;display:none;flex-direction:column;align-items:center;gap:.6vh;background:#1B2B4B;color:#fff;padding:2vh 4vw;z-index:20;text-align:center}
+  .gbar.show{display:flex}
+  .overlay .note{white-space:pre-line}
+  .gbar b{font-size:clamp(20px,3vw,38px);font-weight:900}
+  .gbar span{font-size:clamp(14px,1.8vw,22px);font-weight:700;opacity:.9}
+  .gbar button{font:inherit;font-weight:900;border:0;border-radius:999px;cursor:pointer;font-size:clamp(14px,1.8vw,22px);padding:.8vh 2.6vw;background:#fff;color:#1B2B4B;margin-top:.6vh}
 </style>
 </head>
 <body>
@@ -118,10 +143,13 @@
     <div class="date" id="date"></div></div>
     <div class="board" id="board"><small>教室からのメッセージ</small><span id="boardText">本日は特別なメッセージはありません</span></div></div>
     <div class="guiderow"><div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div><div class="cds" id="cds"></div></div>
-    <div class="msgbtns"><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
+    <div class="msgbtns"><button class="msgbtn guest" id="guestBtn" type="button">ゲストの方はこちら</button><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
   </div>
 </div>
 <div class="brand">みんなのサブスク</div>
+
+<div class="gpanel" id="gPanel"></div>
+<div class="gbar" id="gBar"><b id="gBarTitle">顔が見えるように写真に写ってください</b><span>ゲスト用のQRコードをカメラにかざしてね</span><span>※休会生・ビジターは30分以上の滞在で有料になります</span><button type="button" id="gBarCancel">キャンセル</button></div>
 
 <div class="msgbar" id="msgBar"><span id="msgBarText">メッセージを送る人のQRコードをかざしてね</span><button type="button" id="msgBarCancel">キャンセル</button></div>
 
@@ -291,7 +319,9 @@ function sendBg(text, photo, ent, act, tries){
 
 function onCode(text){
     if (busy) return;
+    if (guestMode) { guestCode(text); return; }
     if (msgMode) { msgCode(text); return; }
+    if (text.trim() === 'SUBSC:GUEST') { busy = true; beep(660, .2); show('err', 'ゲストの方へ', '', '先に「ゲストの方はこちら」を押してね', ''); setTimeout(reset, 3000); return; }
     var now = Date.now();
     if (text === lastText && now - lastTime < 6000) return;
     lastText = text; lastTime = now;
@@ -468,6 +498,104 @@ function onCode(text){
   document.getElementById('cCancel').onclick = msgCancel;
   document.getElementById('cSend').onclick = msgSend;
   document.getElementById('cText').addEventListener('input', msgCount);
+
+  // ===== ゲストの入退室 =====
+  var GUEST_CATS = ['体験生', '休会生', 'ビジター', 'メンター', '保護者', 'その他'];
+  var G = null, guestMode = false, gTimer = null, gIdle = null;
+  var GNOTE = '※休会生・ビジターは30分以上の滞在で有料になります';
+  function gEsc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function gPanel(html){ var p = document.getElementById('gPanel'); p.innerHTML = html; p.classList.add('show'); clearTimeout(gIdle); gIdle = setTimeout(guestCancel, 90000); }
+  function gClose(){ document.getElementById('gPanel').classList.remove('show'); clearTimeout(gIdle); var a = document.activeElement; if (a && a.blur) a.blur(); }
+  function guestCancel(){ gClose(); guestEnd(); G = null; busy = false; lastText = ''; }
+  function guestStart(){
+    if (busy && !G) return;
+    busy = true; G = { act: '', cat: '', name: '', gid: '' };
+    gPanel('<h2>ゲストの方の受付</h2><p class="gnote">入室ですか？退室ですか？</p>'
+      + '<div class="ggrid two"><button type="button" class="in" data-act="in">入室</button><button type="button" class="out" data-act="out">退室</button></div>'
+      + '<p class="gnote">' + GNOTE + '</p><div class="row"><button type="button" data-cancel>やめる</button></div>');
+  }
+  function guestCats(){
+    gPanel('<h2>' + (G.act === 'in' ? '入室' : '退室') + '：あてはまるものを選んでね</h2>'
+      + '<div class="ggrid">' + GUEST_CATS.map(function(c){ return '<button type="button" data-cat="' + c + '">' + c + '</button>'; }).join('') + '</div>'
+      + '<div class="row"><button type="button" data-back="act">もどる</button><button type="button" data-cancel>やめる</button></div>');
+  }
+  function guestName(){
+    gPanel('<h2>' + gEsc(G.cat) + '：お名前を入力してください</h2>'
+      + '<input id="gName" maxlength="20" placeholder="例：山田 花子" autocomplete="off">'
+      + '<div class="row"><button type="button" data-back="cat">もどる</button><button type="button" data-cancel>やめる</button><button type="button" class="next" id="gNext" disabled>次へ</button></div>');
+    var inp = document.getElementById('gName');
+    inp.value = G.name || ''; document.getElementById('gNext').disabled = !inp.value.trim();
+    inp.addEventListener('input', function(){ document.getElementById('gNext').disabled = !inp.value.trim(); clearTimeout(gIdle); gIdle = setTimeout(guestCancel, 90000); });
+    inp.addEventListener('keydown', function(e){ if (e.key === 'Enter' && inp.value.trim()) guestToCamera(); });
+    setTimeout(function(){ inp.focus(); }, 100);
+  }
+  function guestOutList(){
+    gPanel('<h2>退室：お名前を選んでね</h2><div class="glist" id="gList"><p class="gnote">読み込み中…</p></div>'
+      + '<div class="row"><button type="button" data-back="act">もどる</button><button type="button" data-cancel>やめる</button></div>');
+    fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_guest_list', key:KEY }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        var list = (r && r.ok && r.list) || [];
+        var el = document.getElementById('gList'); if (!el) return;
+        el.innerHTML = list.map(function(x){ return '<button type="button" data-gid="' + gEsc(x.id) + '" data-name="' + gEsc(x.name) + '" data-gcat="' + gEsc(x.cat) + '">' + gEsc(x.name) + 'さん<small>' + gEsc(x.cat) + '・' + gEsc(x.in) + '入室</small></button>'; }).join('')
+          + '<button type="button" data-notlisted style="text-align:center;background:var(--paper)">一覧に名前がない</button>';
+      })
+      .catch(function(){ var el = document.getElementById('gList'); if (el) el.innerHTML = '<button type="button" data-notlisted style="text-align:center">名前を入力して退室する</button>'; });
+  }
+  function guestToCamera(){
+    var inp = document.getElementById('gName'); if (inp) G.name = inp.value.trim();
+    if (!G.name) return;
+    gClose();
+    document.getElementById('gBarTitle').textContent = G.name + 'さん：顔が見えるように写真に写ってください';
+    document.getElementById('gBar').classList.add('show');
+    guestMode = true; busy = false; lastText = '';
+    clearTimeout(gTimer); gTimer = setTimeout(guestCancel, 60000);
+  }
+  function guestEnd(){ guestMode = false; clearTimeout(gTimer); document.getElementById('gBar').classList.remove('show'); }
+  function guestCode(text){
+    if (text.trim() !== 'SUBSC:GUEST') {
+      busy = true; beep(220, .25);
+      show('err', 'ゲスト用のQRコードをかざしてね', '', '教室にあるゲスト用のQRコードを使ってね', '');
+      setTimeout(function(){ document.getElementById('overlay').className = 'overlay'; busy = false; lastText = ''; }, 2500);
+      return;
+    }
+    clearTimeout(gTimer);
+    document.getElementById('gBar').classList.remove('show');
+    busy = true; beep(880, .12);
+    show('wait', 'そのまま カメラを見てね', '', '', '', true);
+    var g = G;
+    setTimeout(function(){
+      var photo = capture();
+      document.getElementById('oMsg').textContent = '送信中…';
+      fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_guest', key:KEY, act:g.act, cat:g.cat, name:g.name, gid:g.gid, photo:photo }) })
+        .then(function(r){ return r.json(); })
+        .then(function(r){
+          guestMode = false; G = null;
+          if (!r || !r.ok) { beep(220, .3); show('err', (r && r.message) || '受付できませんでした', '', '先生に声をかけてください', ''); }
+          else {
+            chime(r.act === '入室');
+            var note = GNOTE;
+            if (r.act === '退室' && r.min != null) note = '滞在 ' + (r.min >= 60 ? Math.floor(r.min / 60) + '時間' : '') + (r.min % 60) + '分' + (r.charged ? '（有料になります。お支払いは先生へ）' : '') + '\n' + GNOTE;
+            show(r.act === '入室' ? 'in' : 'out', r.name + 'さんが' + r.act + 'しました', '', (r.cat ? r.cat + '　' : '') + r.act + ' ' + r.time, note);
+          }
+          lastText = ''; setTimeout(reset, 4500);
+        })
+        .catch(function(){ guestMode = false; G = null; beep(220, .3); show('err', '通信できませんでした', '', 'もう一度ためしてください', ''); lastText = ''; setTimeout(reset, 3000); });
+    }, 1400);
+  }
+  document.getElementById('guestBtn').onclick = guestStart;
+  document.getElementById('gBarCancel').onclick = guestCancel;
+  document.getElementById('gPanel').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b || !G) return;
+    if (b.hasAttribute('data-cancel')) return guestCancel();
+    if (b.dataset.act) { G.act = b.dataset.act; G.gid = ''; G.cat = ''; G.name = ''; return G.act === 'out' ? guestOutList() : guestCats(); }
+    if (b.dataset.back === 'act') return guestStart();
+    if (b.dataset.back === 'cat') return guestCats();
+    if (b.dataset.cat) { G.cat = b.dataset.cat; return guestName(); }
+    if (b.dataset.gid) { G.gid = b.dataset.gid; G.name = b.dataset.name; G.cat = b.dataset.gcat; return guestToCamera(); }
+    if (b.hasAttribute('data-notlisted')) { G.gid = ''; return guestCats(); }
+    if (b.id === 'gNext') return guestToCamera();
+  });
 
   // ===== 教室からのメッセージ・カウントダウン =====
   var BOARD = null;

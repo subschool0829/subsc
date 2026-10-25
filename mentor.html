@@ -192,6 +192,10 @@
     <p class="muted" style="margin-bottom:8px">ビジターの入退室QRから自動で計算します。入室から2時間30分以内に退室した日は1,200円、それ以上は1,800円です。個別授業だけで来た日など、自習利用料がかからない日は「対象外」にしてください。</p>
     <div class="seg" id="vFilter" style="margin-bottom:8px"><button type="button" data-v="unpaid" aria-pressed="true">未払いのみ</button><button type="button" data-v="all">すべて</button></div>
     <div id="vList"><div class="loading">読み込み中…</div></div>
+    <div class="row" style="margin-top:28px"><h2>ゲスト（30分以上の滞在）</h2><b id="gpSum" style="color:var(--warn)"></b></div>
+    <p class="muted" style="margin-bottom:8px">受付タブレットの「ゲストの方はこちら」から入退室した人のうち、30分以上滞在した記録です。休会生・ビジターは最初「未入金」、それ以外は「請求なし」になります。</p>
+    <div class="seg" id="gpFilter" style="margin-bottom:8px"><button type="button" data-v="unpaid" aria-pressed="true">未入金のみ</button><button type="button" data-v="all">すべて</button></div>
+    <div id="gpList"><div class="loading">読み込み中…</div></div>
     <div id="feeBox" hidden>
       <div class="row" style="margin-top:28px"><h2>月謝の入金</h2><div style="display:flex;gap:6px;align-items:center"><button class="btn" id="fPrev" aria-label="前の月">◀</button><b id="fMonth"></b><button class="btn" id="fNext" aria-label="次の月">▶</button></div></div>
       <p class="muted" id="fSum" style="margin-bottom:8px"></p>
@@ -225,6 +229,9 @@
 <div class="row"><h2>在室中の生徒</h2><button class="btn" id="rmReload">更新</button></div>
 <p class="muted" id="rmCnt" style="margin-bottom:8px"></p>
 <div id="rmList"><div class="loading">読み込み中…</div></div>
+    <div class="row" style="margin-top:24px"><h2>在室中のゲスト</h2></div>
+    <p class="muted" style="margin-bottom:8px">受付タブレットの「ゲストの方はこちら」から入室した人です。</p>
+    <div id="gRoom"><div class="loading">読み込み中…</div></div>
 </section>
 
 <section class="panel" id="p-qr">
@@ -1074,6 +1081,7 @@
   var RMD = null, rmTimer = null;
   var RMC = { '会員': '#0F6E56', 'エリア外': '#2E6DB4', 'ビジター': '#B85C00', '体験': '#7B3FA0', '未設定': '#888' };
   function loadRoom(){
+    loadGuestRoom();
     return api('sch_att_load').then(function(r){ RMD = r; renderRoom(); })
       .catch(function(e){ document.getElementById('rmList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
   }
@@ -1368,6 +1376,7 @@
   var VIS = null, vMode = 'unpaid', FEE = null, feeMonth = null;
   function loadMoney(){
     if (!D.me.admin) return;
+    loadGuestPay();
     api('sch_money_visit_load').then(function(r){ VIS = r; renderVisit(); })
       .catch(function(e){ document.getElementById('vList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
     if (D.me.admin) loadBill();
@@ -1598,6 +1607,46 @@
       toast('カウントダウンを保存しました');
       document.getElementById('bdInfo').textContent = r.updated ? '最終更新 ' + r.updated + (r.by ? '（' + r.by + '）' : '') : '';
     }).catch(function(e){ toast(e.message); }).then(function(){ btn.disabled = false; btn.textContent = '保存'; });
+  });
+
+  // ----- ゲスト（在室・支払い） -----
+  function loadGuestRoom(){
+    api('sch_guest_room').then(function(r){
+      var list = r.list || [];
+      document.getElementById('gRoom').innerHTML = list.length ? list.map(function(x){
+        return '<div class="card" style="padding:12px 14px"><div class="row"><b>' + esc(x.name) + 'さん</b><span class="muted">' + esc(x.cat) + '</span></div><div class="muted">' + esc(x.in) + ' 入室（' + x.min + '分経過）</div></div>';
+      }).join('') : '<div class="card muted">在室中のゲストはいません</div>';
+    }).catch(function(e){ document.getElementById('gRoom').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  var GP = null, gpMode = 'unpaid';
+  function loadGuestPay(){
+    api('sch_guest_pay_load').then(function(r){ GP = r; renderGuestPay(); })
+      .catch(function(e){ document.getElementById('gpList').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  function renderGuestPay(){
+    if (!GP) return;
+    document.getElementById('gpSum').textContent = '未入金 ' + GP.unpaid + '件';
+    var rows = GP.rows.filter(function(r){ return gpMode === 'all' || r.pay === '未入金'; });
+    document.getElementById('gpList').innerHTML = rows.length ? rows.map(function(r){
+      var stay = (r.min >= 60 ? Math.floor(r.min / 60) + '時間' : '') + (r.min % 60) + '分';
+      return '<div class="card" style="padding:12px 14px"><div class="row"><b>' + label(r.date) + '　' + esc(r.name) + 'さん</b><span class="muted">' + esc(r.cat) + '</span></div>'
+        + '<div class="muted">' + esc(r.in || '?') + '〜' + esc(r.out) + '（' + stay + '）' + (r.memo ? '　' + esc(r.memo) : '') + '</div>'
+        + '<div class="seg" data-gp="' + esc(r.id) + '" style="margin-top:8px">' + ['未入金', '入金', '請求なし'].map(function(s){ return '<button type="button" data-st="' + s + '" aria-pressed="' + (r.pay === s) + '">' + s + '</button>'; }).join('') + '</div></div>';
+    }).join('') : '<div class="card muted">' + (gpMode === 'all' ? '30分以上滞在したゲストの記録はありません' : '未入金のゲストはいません') + '</div>';
+  }
+  document.getElementById('gpFilter').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-v]'); if (!b) return;
+    gpMode = b.dataset.v;
+    [].forEach.call(this.querySelectorAll('button'), function(x){ x.setAttribute('aria-pressed', x === b); });
+    renderGuestPay();
+  });
+  document.getElementById('gpList').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-st]'); if (!b) return;
+    var box = b.closest('[data-gp]'), id = box.dataset.gp, st = b.dataset.st;
+    var row = GP.rows.filter(function(r){ return r.id === id; })[0]; if (!row || row.pay === st) return;
+    var prev = row.pay; row.pay = st; GP.unpaid = GP.rows.filter(function(r){ return r.pay === '未入金'; }).length; renderGuestPay();
+    api('sch_guest_pay_set', { id: id, status: st }).then(function(){ toast(st + 'にしました'); })
+      .catch(function(err){ row.pay = prev; GP.unpaid = GP.rows.filter(function(r){ return r.pay === '未入金'; }).length; renderGuestPay(); toast(err.message); });
   });
 
   function isFreeM(m){ return !!m && String(m.name).trim().toLowerCase() === 'free'; }
