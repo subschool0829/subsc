@@ -134,6 +134,28 @@
   .board{justify-content:safe center;height:clamp(100px,24vh,200px)}
   .cam{width:min(100%,82vh)}
   @media (orientation:portrait){.wrap{gap:2vh;padding:2.5vh 5vw 5vh}.cam{width:min(100%,40vh);max-height:40vh}.guide{margin-top:2vh}.board{height:clamp(80px,14vh,170px)}}
+
+  /* おうちの人からの伝言 */
+  .inbox{display:none;flex-direction:column;gap:1vh;margin-top:2.2vh}
+  .inbox.show{display:flex}
+  .inbox button{font:inherit;font-weight:900;font-size:clamp(15px,1.9vw,24px);color:#7a3a00;background:#FFE3C7;border:3px solid #E9861C;border-radius:16px;padding:1vh 1.4vw;text-align:left;cursor:pointer;animation:ipulse 1.6s ease-in-out infinite}
+  @keyframes ipulse{0%,100%{box-shadow:0 0 0 0 rgba(233,134,28,.5)}50%{box-shadow:0 0 0 9px rgba(233,134,28,0)}}
+  .ibar{position:fixed;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;gap:2vw;background:#E9861C;color:#fff;padding:2.2vh 4vw;font-weight:900;font-size:clamp(16px,2.3vw,30px)}
+  .ibar.show{display:flex}
+  .ibar button{font:inherit;font-size:.8em;font-weight:900;background:#fff;color:#c25f00;border:0;border-radius:999px;padding:.7vh 1.8vw;cursor:pointer}
+  .ibox{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(27,43,75,.92);padding:4vh 5vw}
+  .ibox.show{display:flex}
+  .ibox .card{background:#fff;color:var(--ink);border-radius:24px;width:min(920px,100%);max-height:92vh;display:flex;flex-direction:column;gap:2vh;padding:3vh 3vw}
+  .ibox h2{font-size:clamp(20px,3vw,36px);font-weight:900;line-height:1.3}
+  .ibox .list{overflow:auto;display:flex;flex-direction:column;gap:1.6vh}
+  .ibox .item{background:#FFF5CC;border-left:8px solid #F7CE2E;border-radius:14px;padding:1.6vh 1.8vw}
+  .ibox .item.read{background:#eef2f7;border-left-color:#b9c4d6}
+  .ibox .item small{display:block;color:var(--sub);font-weight:700;font-size:clamp(12px,1.4vw,17px);margin-bottom:.6vh}
+  .ibox .item p{white-space:pre-wrap;word-break:break-word;font-weight:700;font-size:clamp(17px,2.4vw,30px);line-height:1.55}
+  .ibox .acts{display:flex;gap:1.6vw;justify-content:flex-end;flex-wrap:wrap}
+  .ibox .acts button{font:inherit;font-weight:900;font-size:clamp(16px,2.2vw,28px);border-radius:999px;padding:1.2vh 2.6vw;border:3px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer}
+  .ibox .acts button.ok{background:var(--in);border-color:var(--in);color:#fff}
+  .ibox .acts button[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -148,10 +170,12 @@
     <div class="date" id="date"></div></div>
     <div class="board" id="board"><small>教室からのメッセージ</small><span id="boardText">本日は特別なメッセージはありません</span></div></div>
     <div class="guiderow"><div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div><div class="cds" id="cds"></div></div>
-    <div class="msgbtns"><button class="msgbtn guest" id="guestBtn" type="button">ゲストの方はこちら</button><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
+    <div class="inbox" id="inbox"></div><div class="msgbtns"><button class="msgbtn guest" id="guestBtn" type="button">ゲストの方はこちら</button><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
   </div>
 </div>
 <div class="brand">みんなのサブスク</div>
+<div class="ibar" id="iBar"><span id="iBarText"></span><button type="button" id="iBarCancel">やめる</button></div>
+<div class="ibox" id="iBox"><div class="card"><h2 id="iTitle"></h2><div class="list" id="iList"></div><div class="acts"><button type="button" id="iLater">とじる</button><button type="button" class="ok" id="iOk">読みました</button></div></div></div>
 
 <div class="gpanel" id="gPanel"></div>
 <div class="gbar" id="gBar"><b id="gBarTitle">顔が見えるように写真に写ってください</b><span>ゲスト用のQRコードをカメラにかざしてね</span><span>※休会生・ビジターは30分以上の滞在で有料になります</span><button type="button" id="gBarCancel">キャンセル</button></div>
@@ -324,6 +348,7 @@ function sendBg(text, photo, ent, act, tries){
 
 function onCode(text){
     if (busy) return;
+    if (inMode) { inboxCode(text); return; }
     if (guestMode) { guestCode(text); return; }
     if (msgMode) { msgCode(text); return; }
     if (text.trim() === 'SUBSC:GUEST') { busy = true; beep(660, .2); show('err', 'ゲストの方へ', '', '先に「ゲストの方はこちら」を押してね', ''); setTimeout(reset, 3000); return; }
@@ -658,6 +683,101 @@ function onCode(text){
     if (isIn) { beep(784, .18); beep(1047, .3, .16); }
     else { beep(1047, .18); beep(784, .3, .16); }
   }
+
+  // ===== おうちの人からの伝言（その日限り） =====
+  var inMode = null, inTimer = null, inQr = '', inData = null, inCloseTimer = null;
+  function loadInbox(){
+    if (!KEY) return;
+    fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_inbox', key:KEY }) })
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if (d && d.ok) renderInbox(d.list || []); })
+      .catch(function(){});
+  }
+  function renderInbox(list){
+    var box = document.getElementById('inbox');
+    box.innerHTML = '';
+    list.forEach(function(x){
+      var b = document.createElement('button'); b.type = 'button';
+      b.textContent = '✉ ' + x.name + 'さんへのメッセージあり' + (x.count > 1 ? '（' + x.count + '件）' : '') + '　→ タップ';
+      b.onclick = function(){ inboxStart(x.sid, x.name); };
+      box.appendChild(b);
+    });
+    box.classList.toggle('show', list.length > 0);
+  }
+  function inboxStart(sid, name){
+    if (busy || msgMode || guestMode) return;
+    inMode = { sid: sid, name: name }; lastText = '';
+    document.getElementById('iBarText').textContent = name + 'さん：自分のQRカードをカメラにかざしてね';
+    document.getElementById('iBar').classList.add('show');
+    clearTimeout(inTimer); inTimer = setTimeout(inboxEnd, 60000);
+  }
+  function inboxEnd(){
+    inMode = null; clearTimeout(inTimer);
+    document.getElementById('iBar').classList.remove('show');
+  }
+  function inboxCode(text){
+    var mode = inMode;
+    var id = text.indexOf('SUBSC:') === 0 ? text.slice(6).trim() : '';
+    busy = true;
+    if (id !== mode.sid) {
+      beep(220, .25);
+      show('err', '本人のQRカードをかざしてね', '', mode.name + 'さんへのメッセージです', '');
+      setTimeout(reset, 2500);
+      return;
+    }
+    inboxEnd(); beep(880, .12);
+    show('wait', 'メッセージを開いています…', '', '', '', true);
+    fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_inbox_read', key:KEY, qr:text, sid:mode.sid }) })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok) {
+          show('err', (d && d.message) || '開けませんでした', '', '', '');
+          setTimeout(function(){ reset(); loadInbox(); }, 2500);
+          return;
+        }
+        inQr = text; inData = d;
+        document.getElementById('overlay').className = 'overlay';
+        document.getElementById('iTitle').textContent = d.name + 'さんへ　おうちの人からのメッセージ';
+        var L = document.getElementById('iList'); L.innerHTML = '';
+        d.list.forEach(function(x){
+          var it = document.createElement('div'); it.className = 'item' + (x.read ? ' read' : '');
+          var sm = document.createElement('small'); sm.textContent = (x.from ? x.from + '　' : '') + x.at + (x.read ? '（読んだメッセージ）' : '');
+          var p = document.createElement('p'); p.textContent = x.body;
+          it.appendChild(sm); it.appendChild(p); L.appendChild(it);
+        });
+        var unread = d.list.filter(function(x){ return !x.read; }).length;
+        document.getElementById('iOk').hidden = !unread;
+        document.getElementById('iBox').classList.add('show');
+        clearTimeout(inCloseTimer); inCloseTimer = setTimeout(inboxClose, 180000);
+      })
+      .catch(function(){ show('err', '通信エラー', '', 'もう一度ためしてね', ''); setTimeout(reset, 2500); });
+  }
+  function inboxClose(){
+    clearTimeout(inCloseTimer);
+    document.getElementById('iBox').classList.remove('show');
+    inQr = ''; inData = null; lastText = ''; reset(); loadInbox();
+  }
+  function inboxAck(){
+    if (!inData) return;
+    var ids = inData.list.filter(function(x){ return !x.read; }).map(function(x){ return x.id; });
+    var qr = inQr, name = inData.name;
+    clearTimeout(inCloseTimer);
+    document.getElementById('iBox').classList.remove('show');
+    show('wait', '送信中…', '', '', '', true);
+    fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kiosk_inbox_ack', key:KEY, qr:qr, ids:ids }) })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.ok) { beep(1040, .15); show('in', 'おうちの人に「読みました」と知らせました', name + 'さん', '', ''); }
+        else show('err', (d && d.message) || '送れませんでした', '', 'もう一度ためしてね', '');
+      })
+      .catch(function(){ show('err', '通信エラー', '', 'もう一度ためしてね', ''); })
+      .then(function(){ setTimeout(function(){ inQr = ''; inData = null; lastText = ''; reset(); loadInbox(); }, 3000); });
+  }
+  document.getElementById('iBarCancel').onclick = inboxEnd;
+  document.getElementById('iLater').onclick = inboxClose;
+  document.getElementById('iOk').onclick = inboxAck;
+  ['msgBtn','msgBtnS','msgBtnK','guestBtn'].forEach(function(id){ var b = document.getElementById(id); if (b) b.addEventListener('click', function(){ if (inMode) inboxEnd(); }); });
+  loadInbox(); setInterval(loadInbox, 60000);
 </script>
 </body>
 </html>
