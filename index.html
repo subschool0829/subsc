@@ -138,6 +138,8 @@
   /* おうちの人からの伝言 */
   .inbox{display:none;flex-direction:column;gap:1vh;margin-top:2.2vh}
   .inbox.show{display:flex}
+  .cam .inbox{position:absolute;top:2vh;left:2vh;right:2vh;margin-top:0;z-index:3}
+  .cam .inbox button{background:#E9861C;color:#fff;border-color:#fff;font-size:clamp(15px,2vw,26px);padding:1.2vh 1.4vw;text-align:center}
   .inbox button{font:inherit;font-weight:900;font-size:clamp(15px,1.9vw,24px);color:#7a3a00;background:#FFE3C7;border:3px solid #E9861C;border-radius:16px;padding:1vh 1.4vw;text-align:left;cursor:pointer;animation:ipulse 1.6s ease-in-out infinite}
   @keyframes ipulse{0%,100%{box-shadow:0 0 0 0 rgba(233,134,28,.5)}50%{box-shadow:0 0 0 9px rgba(233,134,28,0)}}
   .ibar{position:fixed;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;gap:2vw;background:#E9861C;color:#fff;padding:2.2vh 4vw;font-weight:900;font-size:clamp(16px,2.3vw,30px)}
@@ -163,14 +165,14 @@
   <div class="cam">
     <video id="video" playsinline muted autoplay></video>
     <div class="frame"><i></i><i></i><i></i><i></i></div>
-    <div class="flash" id="flash"></div>
+    <div class="flash" id="flash"></div><div class="inbox" id="inbox"></div>
   </div>
   <div class="side">
     <div class="toprow"><div class="clk"><div class="clock" id="clock">--:--</div>
     <div class="date" id="date"></div></div>
     <div class="board" id="board"><small>教室からのメッセージ</small><span id="boardText">本日は特別なメッセージはありません</span></div></div>
     <div class="guiderow"><div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div><div class="cds" id="cds"></div></div>
-    <div class="inbox" id="inbox"></div><div class="msgbtns"><button class="msgbtn guest" id="guestBtn" type="button">ゲストの方はこちら</button><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
+    <div class="msgbtns"><button class="msgbtn guest" id="guestBtn" type="button">ゲストの方はこちら</button><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
   </div>
 </div>
 <div class="brand">みんなのサブスク</div>
@@ -698,7 +700,7 @@ function onCode(text){
     box.innerHTML = '';
     list.forEach(function(x){
       var b = document.createElement('button'); b.type = 'button';
-      b.textContent = '✉ ' + x.name + 'さんへのメッセージあり' + (x.count > 1 ? '（' + x.count + '件）' : '') + '　→ タップ';
+      b.textContent = '✉ ' + x.name + 'さんにメッセージ' + (x.count > 1 ? '（' + x.count + '件）' : '') + '　タップしてね';
       b.onclick = function(){ inboxStart(x.sid, x.name); };
       box.appendChild(b);
     });
