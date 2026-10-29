@@ -158,6 +158,15 @@
   .ibox .acts button{font:inherit;font-weight:900;font-size:clamp(16px,2.2vw,28px);border-radius:999px;padding:1.2vh 2.6vw;border:3px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer}
   .ibox .acts button.ok{background:var(--in);border-color:var(--in);color:#fff}
   .ibox .acts button[hidden]{display:none}
+  .msgbtns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.4vh 1.2vw;width:100%}
+  .msgbtn{font-size:clamp(13px,1.5vw,20px);padding:1.1vh 1vw;line-height:1.3;border-radius:18px}
+  .msgbtn.guest{grid-column:1/-1;justify-self:start;padding:1.1vh 2vw}
+  .msgbtn.read.has{background:#E9861C;border-color:#E9861C;color:#fff;animation:ipulse 1.6s ease-in-out infinite}
+  .msgbtn .rc{display:none;margin-left:.5em;background:#fff;color:#c25f00;border-radius:999px;padding:0 .55em;font-size:.9em}
+  .msgbtn.has .rc{display:inline-block}
+  .ibox .isub{font-weight:700;color:var(--sub);font-size:clamp(15px,2vw,24px)}
+  .ipick{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.4vh 1.4vw;overflow:auto}
+  .ipick button{font:inherit;font-weight:900;font-size:clamp(18px,2.6vw,32px);background:#FFE3C7;color:#7a3a00;border:3px solid #E9861C;border-radius:18px;padding:2vh 1.4vw;cursor:pointer}
 </style>
 </head>
 <body>
@@ -165,18 +174,19 @@
   <div class="cam">
     <video id="video" playsinline muted autoplay></video>
     <div class="frame"><i></i><i></i><i></i><i></i></div>
-    <div class="flash" id="flash"></div><div class="inbox" id="inbox"></div>
+    <div class="flash" id="flash"></div>
   </div>
   <div class="side">
     <div class="toprow"><div class="clk"><div class="clock" id="clock">--:--</div>
     <div class="date" id="date"></div></div>
     <div class="board" id="board"><small>教室からのメッセージ</small><span id="boardText">本日は特別なメッセージはありません</span></div></div>
     <div class="guiderow"><div class="guide">QRコードを<br>カメラにかざしてね<small>入るときも、帰るときも同じカードでOK</small></div><div class="cds" id="cds"></div></div>
-    <div class="msgbtns"><button class="msgbtn guest" id="guestBtn" type="button">ゲストの方はこちら</button><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
+    <div class="msgbtns"><button class="msgbtn guest" id="guestBtn" type="button">ゲストの方はこちら</button><button class="msgbtn" id="msgBtn" type="button">おうちの人にメッセージを送る</button><button class="msgbtn read" id="msgBtnR" type="button">おうちの人からのメッセージを読む<span class="rc" id="msgBtnRc">0</span></button><button class="msgbtn" id="msgBtnS" type="button">Seiwaにメッセージを送る</button><button class="msgbtn" id="msgBtnK" type="button">Kentoにメッセージを送る</button></div>
   </div>
 </div>
 <div class="brand">みんなのサブスク</div>
 <div class="ibar" id="iBar"><span id="iBarText"></span><button type="button" id="iBarCancel">やめる</button></div>
+<div class="ibox" id="iPick"><div class="card"><h2>おうちの人からのメッセージ</h2><p class="isub" id="iPickSub"></p><div class="ipick" id="iPickList"></div><div class="acts"><button type="button" id="iPickClose">とじる</button></div></div></div>
 <div class="ibox" id="iBox"><div class="card"><h2 id="iTitle"></h2><div class="list" id="iList"></div><div class="acts"><button type="button" id="iLater">とじる</button><button type="button" class="ok" id="iOk">読みました</button></div></div></div>
 
 <div class="gpanel" id="gPanel"></div>
@@ -696,15 +706,38 @@ function onCode(text){
       .catch(function(){});
   }
   function renderInbox(list){
-    var box = document.getElementById('inbox');
-    box.innerHTML = '';
-    list.forEach(function(x){
+    INBOX = list || [];
+    var n = 0; INBOX.forEach(function(x){ n += x.count || 1; });
+    var b = document.getElementById('msgBtnR');
+    if (b) {
+      b.classList.toggle('has', n > 0);
+      document.getElementById('msgBtnRc').textContent = n;
+    }
+    if (document.getElementById('iPick').classList.contains('show')) renderPick();
+  }
+  // 「おうちの人からのメッセージを読む」→ 生徒名の一覧
+  var INBOX = [], pickTimer = null;
+  function pickOpen(){
+    if (busy || msgMode || guestMode) return;
+    if (inMode) inboxEnd();
+    renderPick();
+    document.getElementById('iPick').classList.add('show');
+    clearTimeout(pickTimer); pickTimer = setTimeout(pickClose, 60000);
+    loadInbox();
+  }
+  function pickClose(){
+    clearTimeout(pickTimer);
+    document.getElementById('iPick').classList.remove('show');
+  }
+  function renderPick(){
+    var L = document.getElementById('iPickList'); L.innerHTML = '';
+    INBOX.forEach(function(x){
       var b = document.createElement('button'); b.type = 'button';
-      b.textContent = '✉ ' + x.name + 'さんにメッセージ' + (x.count > 1 ? '（' + x.count + '件）' : '') + '　タップしてね';
-      b.onclick = function(){ inboxStart(x.sid, x.name); };
-      box.appendChild(b);
+      b.textContent = x.name + 'さん' + (x.count > 1 ? '（' + x.count + '件）' : '');
+      b.onclick = function(){ pickClose(); inboxStart(x.sid, x.name); };
+      L.appendChild(b);
     });
-    box.classList.toggle('show', list.length > 0);
+    document.getElementById('iPickSub').textContent = INBOX.length ? '自分の名前をタップしてね' : 'いま届いているメッセージはありません';
   }
   function inboxStart(sid, name){
     if (busy || msgMode || guestMode) return;
@@ -779,6 +812,8 @@ function onCode(text){
   document.getElementById('iLater').onclick = inboxClose;
   document.getElementById('iOk').onclick = inboxAck;
   ['msgBtn','msgBtnS','msgBtnK','guestBtn'].forEach(function(id){ var b = document.getElementById(id); if (b) b.addEventListener('click', function(){ if (inMode) inboxEnd(); }); });
+  document.getElementById('msgBtnR').onclick = pickOpen;
+  document.getElementById('iPickClose').onclick = pickClose;
   loadInbox(); setInterval(loadInbox, 60000);
 </script>
 </body>
