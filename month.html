@@ -35,6 +35,8 @@
   .foot .n2{background:#FFFF33;color:#D0021B;font-weight:900;font-size:14px;padding:4px 8px;margin-top:4px;white-space:pre-wrap}
   .wait{padding:40px 0;text-align:center;color:var(--sub);font-weight:700}
   .legend{font-size:12px;color:var(--sub);margin-top:8px}
+  body.pv .tabs,body.pv header,body.pv .ctrl,body.pv footer,body.pv .pnote{display:none}
+  body.pv .wrap{padding:10px 10px 20px;max-width:none}
   @media (max-width:600px){
     table.mt{font-size:12px;min-width:500px}
     .mt th,.mt td{padding:2px 3px}
@@ -190,7 +192,16 @@
   }
   document.getElementById('ym').addEventListener('change', function(){ load(this.value); });
   document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
-  load((location.search.match(/[?&]m=(\d{4}-\d{2})/) || [])[1] || '');
+  // メンターページのプレビュー（公開前の内容を表示）
+  if (/[?&]preview=1/.test(location.search)) {
+    document.body.classList.add('pv');
+    window.addEventListener('message', function(e){
+      if (e.origin !== location.origin || !e.data || !e.data.monthPreview) return;
+      render(e.data.monthPreview);
+    });
+  } else {
+    load((location.search.match(/[?&]m=(\d{4}-\d{2})/) || [])[1] || '');
+  }
 </script>
 </body>
 </html>
