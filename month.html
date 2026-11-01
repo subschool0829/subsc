@@ -113,7 +113,9 @@
   }
 
   function title(k){
-    var t = String(k.title || '').replace(/^\s*(新)?(小|中|高)\s*[0-9０-９]?\s*(講座)?\s*/, '').trim();
+    var t = String(k.title || ''), p;
+    do { p = t; t = t.replace(/^\s*(新)?(小|中|高)\s*[0-9０-９]\s*(講座)?\s*/, ''); } while (t && t !== p);
+    t = t.trim();
     return t || '講座';
   }
   function hm(t){ var p = String(t || '').split(':'); return p.length > 1 ? (+p[0]) + ':' + p[1] : String(t || ''); }
