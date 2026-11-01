@@ -64,6 +64,9 @@
 .kzl{font-weight:700;margin-top:2px}
 .kzm{font-variant-numeric:tabular-nums;margin-right:8px}
 .kzl small{color:var(--sub);font-weight:500}
+  .mlink{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 0 4px;padding:14px 18px;border:3px solid var(--ink);border-radius:16px;background:var(--tint);color:var(--ink);text-decoration:none;font-weight:900;font-size:17px}
+  .mlink small{display:block;font-size:12px;font-weight:700;color:var(--sub)}
+  .mlink::after{content:'›';font-size:26px;line-height:1}
 </style>
 </head>
 <body>
@@ -74,6 +77,7 @@
     <h1>メンター在室・行事</h1>
     <p class="lead">今日から2週間の、メンターごとの在室時間と行事の予定です。予定は変わることがあります。</p>
   </header>
+  <a class="mlink" href="month.html"><span>📅 月間予定はこちら<small>講座・行事の予定を月ごとに見られます（A4で印刷もできます）</small></span></a>
   <div class="nowbox" id="now"></div>
   <div class="days" id="days"><p class="loading">読み込み中…</p></div>
   <div class="box">

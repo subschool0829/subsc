@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>月間予定（講座・行事）｜みんなのサブスク</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .ctrl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:18px 0 14px}
+  .ctrl label{font-weight:900;font-size:15px}
+  .ctrl select{font:inherit;font-weight:900;font-size:17px;padding:8px 12px;border:2px solid var(--ink);border-radius:12px;background:#fff;color:var(--ink)}
+  .ctrl button{font:inherit;font-weight:900;font-size:15px;padding:9px 18px;border-radius:999px;border:2px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;margin-left:auto}
+  .back{display:inline-block;margin-top:14px;font-weight:700;font-size:14px;color:var(--sub)}
+  .sheet{margin-top:6px}
+  .ttl{background:#FF99E6;text-align:center;font-weight:900;font-size:15px;padding:5px 8px;margin-bottom:10px;line-height:1.5}
+  .ttl b{color:#D0021B}
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.mt{border-collapse:collapse;width:100%;min-width:560px;font-size:14px;line-height:1.3;table-layout:fixed}
+  .mt th,.mt td{border:1px solid #333;padding:3px 4px;text-align:center;height:26px;overflow:hidden}
+  .mt thead th{font-weight:900;font-size:14px;background:#fff}
+  .mt thead th small{display:block;font-size:10px;font-weight:500;color:#555}
+  .mt td.dt{text-align:right;padding-right:8px;white-space:nowrap}
+  .mt td.wd{font-weight:700}
+  .mt td.wd.hol{background:#FF99E6}
+  .mt td.ab{font-size:15px}
+  .mt td.rm{font-size:12px;text-align:left}
+  .mt td.rm span{display:block;background:#FFFF33;padding:1px 3px;margin:1px 0;text-align:center}
+  .mt td.c{font-weight:500;white-space:nowrap}
+  .mt td.c div + div{border-top:1px dashed rgba(0,0,0,.35)}
+  .mt tr.today td.dt,.mt tr.today td.wd{outline:3px solid #F7CE2E;outline-offset:-3px}
+  .foot{margin-top:12px;text-align:center}
+  .foot .n1{font-size:14px}
+  .foot .n2{background:#FFFF33;color:#D0021B;font-weight:900;font-size:14px;padding:4px 8px;margin-top:4px;white-space:pre-wrap}
+  .wait{padding:40px 0;text-align:center;color:var(--sub);font-weight:700}
+  .legend{font-size:12px;color:var(--sub);margin-top:8px}
+  @media (max-width:600px){
+    table.mt{font-size:12px;min-width:500px}
+    .mt th,.mt td{padding:2px 3px}
+    .ttl{font-size:13px}
+  }
+  @media print{
+    @page{size:A4 portrait;margin:9mm 10mm}
+    body{font-size:11pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .wrap{max-width:none;padding:0}
+    .tabs,header,.ctrl,.back,.legend,footer,.pnote{display:none!important}
+    .tw{overflow:visible}
+    table.mt{min-width:0;font-size:10pt}
+    .mt th,.mt td{height:6.6mm;padding:1px 3px}
+    .mt tr.today td{outline:none!important}
+    .ttl{font-size:11pt;margin-bottom:3mm}
+    .foot{margin-top:3mm}
+    .foot .n1,.foot .n2{font-size:10pt}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="tabs"><a href="annai.html">運営案内</a><a href="ryokin.html">料金表</a><a href="schedule.html" aria-current="page">在室・行事</a></nav>
+  <header>
+    <div class="brand">みんなのサブスク</div>
+    <h1>月間予定（講座・行事）</h1>
+    <p class="lead">月を選ぶと、その月の講座と行事の予定が見られます。印刷するとA4サイズ1枚になります。</p>
+    <a class="back" href="schedule.html">← メンター在室・行事にもどる</a>
+  </header>
+  <div class="ctrl">
+    <label for="ym">月を選ぶ</label>
+    <select id="ym"><option>読み込み中…</option></select>
+    <button type="button" id="printBtn">印刷する（A4）</button>
+  </div>
+  <div class="sheet" id="sheet"><p class="wait">読み込み中…</p></div>
+  <p class="legend pnote">S・K の欄の「×」は、そのメンターが不在の日です。予定は変わることがあります。</p>
+  <footer>みんなのサブスク　石川県かほく市宇野気62-1 江川ビル2階</footer>
+</div>
+<script>
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbwoPiOpPmUcykIrgUGYj5f0z1jnPA6gH3cU2aUDsqSLVKlAB9CytbtpYb8iqHAS81kQ-g/exec';
+  var WD = ['日','月','火','水','木','金','土'];
+  var COLORS = ['#F8B98F','#92D050','#2FB8F0','#FFD966','#C9A7E8','#F4A6B8','#9DD9C5'];
+  var ORDER = ['小','小1','小2','小3','小4','小5','小6','中1','中2','中3','高1','高2','高3'];
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function z2(n){ return ('0' + n).slice(-2); }
+  function zen2han(s){ return String(s || '').replace(/[０-９]/g, function(c){ return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }); }
+  function normT(t){ return zen2han(t).replace(/\s|　/g, '').replace(/^新/, ''); }
+
+  // 日本の祝日（振替休日・国民の休日を含む）
+  function holidays(y){
+    var h = {};
+    function add(m, d){ h[y + '-' + z2(m) + '-' + z2(d)] = true; }
+    function nthMon(m, n){ var d = new Date(y, m - 1, 1); var first = (8 - d.getDay()) % 7 + 1; return first + (n - 1) * 7; }
+    [[1,1],[2,11],[2,23],[4,29],[5,3],[5,4],[5,5],[8,11],[11,3],[11,23]].forEach(function(x){ add(x[0], x[1]); });
+    add(1, nthMon(1, 2)); add(7, nthMon(7, 3)); add(9, nthMon(9, 3)); add(10, nthMon(10, 2));
+    add(3, Math.floor(20.8431 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4)));
+    add(9, Math.floor(23.2488 + 0.242194 * (y - 1980) - Math.floor((y - 1980) / 4)));
+    var keys = Object.keys(h).sort();
+    keys.forEach(function(k){
+      var d = new Date(k + 'T00:00:00');
+      if (d.getDay() === 0) {
+        var n = new Date(d); do { n.setDate(n.getDate() + 1); } while (h[n.getFullYear() + '-' + z2(n.getMonth() + 1) + '-' + z2(n.getDate())]);
+        h[n.getFullYear() + '-' + z2(n.getMonth() + 1) + '-' + z2(n.getDate())] = true;
+      }
+    });
+    keys.forEach(function(k){
+      var d = new Date(k + 'T00:00:00'); d.setDate(d.getDate() + 2);
+      var k2 = d.getFullYear() + '-' + z2(d.getMonth() + 1) + '-' + z2(d.getDate());
+      d.setDate(d.getDate() - 1);
+      var mid = d.getFullYear() + '-' + z2(d.getMonth() + 1) + '-' + z2(d.getDate());
+      if (h[k2] && !h[mid] && d.getDay() !== 0) h[mid] = true;
+    });
+    return h;
+  }
+
+  function title(k){
+    var t = String(k.title || '').replace(/^\s*(新)?(小|中|高)\s*[0-9０-９]?\s*(講座)?\s*/, '').trim();
+    return t || '講座';
+  }
+  function hm(t){ var p = String(t || '').split(':'); return p.length > 1 ? (+p[0]) + ':' + p[1] : String(t || ''); }
+
+  function render(res){
+    var sheet = document.getElementById('sheet');
+    var ym = res.month, y = +ym.slice(0, 4), m = +ym.slice(5, 7);
+    if (!res.data) {
+      sheet.innerHTML = '<p class="wait">' + m + '月の予定は準備中です。<br>翌月分は毎月15日ごろまでに公開します。</p>';
+      return;
+    }
+    var d = res.data, hol = holidays(y);
+    var today = (function(){ var n = new Date(); return n.getFullYear() + '-' + z2(n.getMonth() + 1) + '-' + z2(n.getDate()); })();
+    // 学年の列
+    var cols = [], seen = {};
+    d.days.forEach(function(x){
+      x.kouza.concat(x.events).forEach(function(k){
+        var t = normT(k.target); if (!t || seen[t]) return; seen[t] = true; cols.push(t);
+      });
+    });
+    cols.sort(function(a, b){
+      var ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || (a < b ? -1 : 1);
+    });
+    var ms = d.mentors || [];
+    var h = '<div class="ttl">' + y + '年 ' + m + '月 講座・行事予定　<b>※内容・時間の変更・追加は随時連絡します。</b></div>';
+    h += '<div class="tw"><table class="mt"><colgroup><col style="width:4.6em"><col style="width:2.4em">';
+    cols.forEach(function(){ h += '<col>'; });
+    ms.forEach(function(){ h += '<col style="width:2.2em">'; });
+    h += '<col style="width:' + (cols.length > 3 ? '17%' : '22%') + '"></colgroup><thead><tr><th></th><th></th>';
+    cols.forEach(function(c){ h += '<th>' + esc(c) + '</th>'; });
+    ms.forEach(function(x){ h += '<th>' + esc(String(x.name).charAt(0).toUpperCase()) + '<small>不在</small></th>'; });
+    h += '<th>備考</th></tr></thead><tbody>';
+    d.days.forEach(function(x){
+      var dd = +x.date.slice(8, 10), isHol = x.wd === '日' || x.wd === '土' || hol[x.date];
+      h += '<tr' + (x.date === today ? ' class="today"' : '') + '><td class="dt">' + m + '月' + dd + '日</td><td class="wd' + (isHol ? ' hol' : '') + '">' + x.wd + '</td>';
+      var rest = [];
+      cols.forEach(function(c, ci){
+        var items = [];
+        x.kouza.forEach(function(k){ if (normT(k.target) === c) items.push(hm(k.start) + ' ' + title(k)); });
+        x.events.forEach(function(e){ if (normT(e.target) === c) items.push((e.start ? hm(e.start) + ' ' : '') + e.name); });
+        h += items.length ? '<td class="c" style="background:' + COLORS[ci % COLORS.length] + '">' + items.map(function(t){ return '<div>' + esc(t) + '</div>'; }).join('') + '</td>' : '<td></td>';
+      });
+      x.kouza.forEach(function(k){ if (!normT(k.target)) rest.push(hm(k.start) + ' ' + (k.title || '講座')); });
+      x.events.forEach(function(e){ if (!normT(e.target)) rest.push((e.start ? hm(e.start) + ' ' : '') + e.name); });
+      ms.forEach(function(mm){ h += '<td class="ab">' + ((x.absent || []).indexOf(mm.id) >= 0 ? '×' : '') + '</td>'; });
+      if (hol[x.date] && x.wd !== '日' && x.wd !== '土') rest.unshift('祝日');
+      h += '<td class="rm">' + rest.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    var note = String(res.note || '').trim();
+    h += '<div class="foot">' + (note ? '<div class="n2">' + esc(note) + '</div>' : '') + '</div>';
+    sheet.innerHTML = h;
+    document.title = y + '年' + m + '月 講座・行事予定｜みんなのサブスク';
+  }
+
+  function fillSelect(months, cur){
+    var sel = document.getElementById('ym');
+    var list = months.slice();
+    if (list.indexOf(cur) < 0) list.push(cur);
+    list.sort();
+    sel.innerHTML = list.map(function(k){ return '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + (+k.slice(0, 4)) + '年' + (+k.slice(5, 7)) + '月' + (months.indexOf(k) < 0 ? '（準備中）' : '') + '</option>'; }).join('');
+  }
+
+  function load(ym){
+    document.getElementById('sheet').innerHTML = '<p class="wait">読み込み中…</p>';
+    fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'sch_month_public', month: ym || '' }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        if (!r.ok) throw new Error();
+        fillSelect(r.months || [], r.month);
+        render(r);
+        try { history.replaceState(null, '', '?m=' + r.month); } catch(e){}
+      })
+      .catch(function(){ document.getElementById('sheet').innerHTML = '<p class="wait">予定を読み込めませんでした。時間をおいて開き直してください。</p>'; });
+  }
+  document.getElementById('ym').addEventListener('change', function(){ load(this.value); });
+  document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
+  load((location.search.match(/[?&]m=(\d{4}-\d{2})/) || [])[1] || '');
+</script>
+</body>
+</html>
