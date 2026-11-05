@@ -167,6 +167,7 @@
   .ibox .isub{font-weight:700;color:var(--sub);font-size:clamp(15px,2vw,24px)}
   .ipick{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.4vh 1.4vw;overflow:auto}
   .ipick button{font:inherit;font-weight:900;font-size:clamp(18px,2.6vw,32px);background:#FFE3C7;color:#7a3a00;border:3px solid #E9861C;border-radius:18px;padding:2vh 1.4vw;cursor:pointer}
+  .gbar button.shot{background:#169B6B;color:#fff;font-size:clamp(18px,2.6vw,32px);padding:1.4vh 4.5vw;box-shadow:0 0 0 4px #fff}
 </style>
 </head>
 <body>
@@ -190,7 +191,7 @@
 <div class="ibox" id="iBox"><div class="card"><h2 id="iTitle"></h2><div class="list" id="iList"></div><div class="acts"><button type="button" id="iLater">とじる</button><button type="button" class="ok" id="iOk">読みました</button></div></div></div>
 
 <div class="gpanel" id="gPanel"></div>
-<div class="gbar" id="gBar"><b id="gBarTitle">顔が見えるように写真に写ってください</b><span>ゲスト用のQRコードをカメラにかざしてね</span><span>※休会生・ビジターは30分以上の滞在で有料になります</span><button type="button" id="gBarCancel">キャンセル</button></div>
+<div class="gbar" id="gBar"><b id="gBarTitle">顔が見えるように写真に写ってください</b><span>カメラに顔を向けて「撮影する」を押してね</span><span>※休会生・ビジターは30分以上の滞在で有料になります</span><button type="button" id="gBarShot" class="shot">📷 撮影する</button><button type="button" id="gBarCancel">キャンセル</button></div>
 
 <div class="msgbar" id="msgBar"><span id="msgBarText">メッセージを送る人のQRコードをかざしてね</span><button type="button" id="msgBarCancel">キャンセル</button></div>
 
@@ -815,6 +816,8 @@ function onCode(text){
   document.getElementById('msgBtnR').onclick = pickOpen;
   document.getElementById('iPickClose').onclick = pickClose;
   loadInbox(); setInterval(loadInbox, 60000);
+  // ゲスト：QRコードなしで、撮影ボタンで受付
+  document.getElementById('gBarShot').onclick = function(){ if (guestMode && !busy) guestCode('SUBSC:GUEST'); };
 </script>
 </body>
 </html>
