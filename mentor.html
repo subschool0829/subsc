@@ -882,8 +882,9 @@
   // ===== Kentoへの支払い（オーナーのみ） =====
   var PAYD = null, payMonth = null;
   function loadPay(){
-    if (!payMonth) payMonth = ymNext(D.today.slice(0, 7), 1);
-    var p = payMonth.split('-');
+    // 支払いは「◯月の請求」で計算し、その前の月の分（◯−12月分）として請求の月の15日に支払う
+    if (!payMonth) payMonth = ymNext(D.today.slice(0, 7), +D.today.slice(8, 10) <= 15 ? 0 : 1);
+    var p = ymNext(payMonth, -1).split('-');
     document.getElementById('pyMonth').textContent = (+p[0]) + '年' + (+p[1]) + '月分';
     return api('sch_pay_load', { month: payMonth }).then(function(r){ PAYD = r; renderPay(); })
       .catch(function(e){ document.getElementById('pyBox').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
@@ -891,7 +892,7 @@
   function renderPay(){
     var P = PAYD, pd = P.payDay.split('-');
     var line = function(a, b, sub, neg){ return '<div class="att"><div><b>' + a + '</b>' + (sub ? '<div class="muted" style="font-size:12px">' + sub + '</div>' : '') + '</div><b style="white-space:nowrap' + (neg ? ';color:var(--warn)' : '') + '">' + b + '</b></div>'; };
-    var h = '<div class="card"><p class="muted">' + esc(P.monthLabel) + 'の請求で計算 ／ 支払日 ' + (+pd[1]) + '月' + (+pd[2]) + '日' + (P.paid ? '　<span class="tag" style="background:#0F6E56;color:#fff">支払済み ' + esc(P.paidOn) + '</span>' : '') + '</p>'
+    var h = '<div class="card"><p class="muted">' + esc(P.billLabel || P.monthLabel) + 'の請求で計算 ／ 支払日 ' + (+pd[1]) + '月' + (+pd[2]) + '日' + (P.paid ? '　<span class="tag" style="background:#0F6E56;color:#fff">支払済み ' + esc(P.paidOn) + '</span>' : '') + '</p>'
       + line('教室サポート費用', yen(P.support), '月額利用料−割引（入金済み）' + yen(P.fee.paid) + ' − ' + yen(P.rule.base) + ' の ' + Math.round(P.rule.support * 100) + '%<br>入金済み ' + P.fee.paidCount + '/' + P.fee.count + '件（月額利用料−割引の請求額の合計 ' + yen(P.fee.all) + '）')
       + line('個別授業（Kento）', yen(P.lessons.total), (P.lessons.manual != null ? '手入力' : '授業の記録から自動計算') + '・授業の対象期間 ' + esc(P.period) + '・有料講座を含む')
       + line('教室使用料（控除）', '−' + yen(P.room), '個別授業の ' + Math.round(P.rule.room * 100) + '%', true)
