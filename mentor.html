@@ -1202,14 +1202,14 @@
     if (!ms.length) return '';
     return '<div class="thread">' + ms.map(function(m){ return '<div class="bub ' + (m.mentor ? 'me' : 'them') + '"><small>' + esc(m.name) + '　' + esc(String(m.at).slice(5).replace('-', '/')) + '</small>' + esc(m.text) + '</div>'; }).join('') + '</div>';
   }
-  function needReply(r){ var ms = r.messages || []; return ms.length > 0 && !ms[ms.length - 1].mentor; }
+  function needReply(r){ var ms = r.messages || []; var l = ms[ms.length - 1]; return ms.length > 0 && !l.mentor && !l.done; }
   function findReq(id){ return find(R.requests, id) || find(R.done, id); }
   function renderReq(){
     var wait = R.requests.filter(function(r){ return r.status === '受付待ち'; });
     var chg = R.requests.filter(function(r){ return r.status === '変更依頼中' || r.status === '差し戻し'; });
     var n = wait.length + R.requests.concat(R.done).filter(function(r){ return r.status !== '受付待ち' && needReply(r); }).length;
     var badge = document.getElementById('reqBadge'); badge.hidden = !n; badge.textContent = n;
-    var nt = function(r){ return needReply(r) ? '<span class="newmsg">返信あり</span>' : ''; };
+    var nt = function(r){ return needReply(r) ? '<span class="newmsg">返信あり</span> <button class="btn" data-handled="' + r.id + '">対応済みにする</button>' : ''; };
     var mb = function(r){ return '<button class="btn" data-msg="' + r.id + '">メッセージ</button>'; };
     var html = '<h2>お返事待ち（' + wait.length + '）</h2>';
     html += wait.length ? wait.map(function(r){
@@ -1244,6 +1244,7 @@
     if (b.dataset.rej) return reqReject(find(R.requests, b.dataset.rej));
     if (b.dataset.ret) return reqReturn(find(R.requests, b.dataset.ret));
     if (b.dataset.msg) return reqMsg(findReq(b.dataset.msg));
+    if (b.dataset.handled) return api('sch_req_handled', { id: b.dataset.handled }).then(function(){ toast('対応済みにしました'); loadReq(); }).catch(function(e){ toast(e.message); });
   });
   function reqMsg(r){
     openModal('<h3>メッセージ：' + esc(r.sname) + 'さん</h3>' + (thread(r) || '<p class="muted">まだメッセージはありません。</p>')
