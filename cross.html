@@ -64,6 +64,30 @@
   .start button:focus-visible{outline:4px solid #8fc1ff;outline-offset:4px}
   .start p{color:#EAF6FD;font-size:clamp(14px,1.8vw,20px);line-height:1.7;max-width:40em}
   @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+  /* 名前で受付 */
+  .namebtn{margin-top:3vh;font:inherit;font-weight:900;font-size:clamp(22px,3.2vw,40px);padding:2.4vh 4vw;border-radius:999px;border:0;background:var(--in);color:#fff;cursor:pointer;box-shadow:0 6px 0 #0f7550}
+  .namebtn:active{transform:translateY(4px);box-shadow:0 2px 0 #0f7550}
+  .gpanel{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:flex-start;background:var(--paper);padding:4vh 5vw;z-index:30;gap:2.2vh;overflow:auto}
+  .gpanel.show{display:flex}
+  .gpanel h2{font-size:clamp(22px,3.4vw,42px);font-weight:900;text-align:center;line-height:1.4}
+  .gpanel .gnote{font-size:clamp(14px,1.8vw,22px);font-weight:700;color:var(--sub);text-align:center}
+  .gpanel .ggrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2vw;width:100%;max-width:900px}
+  .gpanel .ggrid button{font:inherit;font-weight:900;font-size:clamp(22px,3.2vw,40px);padding:4vh 1vw;border-radius:22px;border:0;color:#fff;cursor:pointer}
+  .gpanel .ggrid button.in{background:var(--in)} .gpanel .ggrid button.out{background:var(--out)}
+  .gpanel .glist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.4vh 2vw;width:100%;max-width:900px}
+  .gpanel .glist button{font:inherit;font-weight:900;font-size:clamp(18px,2.4vw,30px);padding:2vh 2vw;border-radius:18px;border:3px solid var(--ink);background:#fff;color:var(--ink);text-align:left;cursor:pointer}
+  .gpanel .glist button small{display:block;font-size:.55em;color:var(--sub);font-weight:700;margin-top:.3em}
+  .gpanel .glist button.here{border-color:var(--in)}
+  .gpanel .glist .gnote{grid-column:1/-1}
+  .gpanel input{width:100%;max-width:900px;font:inherit;font-size:clamp(20px,2.8vw,34px);font-weight:700;padding:1.8vh 2vw;border:3px solid var(--ink);border-radius:20px;background:#fff;color:var(--ink)}
+  .gpanel .row{display:flex;gap:3vw;width:100%;max-width:900px;justify-content:flex-end}
+  .gpanel .row button{font:inherit;font-weight:900;border-radius:999px;cursor:pointer;font-size:clamp(18px,2.2vw,26px);padding:1.6vh 3.5vw;background:#fff;color:var(--ink);border:3px solid var(--ink)}
+  .gbar{position:fixed;left:0;right:0;top:0;display:none;flex-direction:column;align-items:center;gap:.8vh;background:#12344D;color:#fff;padding:2vh 4vw;z-index:20;text-align:center}
+  .gbar.show{display:flex}
+  .gbar b{font-size:clamp(20px,3vw,38px);font-weight:900}
+  .gbar span{font-size:clamp(14px,1.8vw,22px);font-weight:700;opacity:.9}
+  .gbar button{font:inherit;font-weight:900;border:0;border-radius:999px;cursor:pointer;font-size:clamp(16px,2vw,24px);padding:1vh 3vw;background:#fff;color:#12344D}
+  .gbar button.shot{background:var(--in);color:#fff;font-size:clamp(24px,3.4vw,42px);padding:1.6vh 6vw}
 </style>
 </head>
 <body>
@@ -76,10 +100,13 @@
   <div class="side">
     <div class="clock" id="clock">--:--</div>
     <div class="date" id="date"></div>
-    <div class="guide">QRコードを<br>カメラにかざしてね<small>来たときも、帰るときも同じカードでOK</small></div>
+    <div class="guide">ボタンを押して<br>名前をえらんでね<small>スタッフはQRカードをかざしてください</small></div>
+    <button class="namebtn" id="nameBtn" type="button">✋ 名前で入室・退室</button>
   </div>
 </div>
 <div class="brand">外日角クロス</div>
+<div class="gpanel" id="gPanel"></div>
+<div class="gbar" id="gBar"><b id="gBarTitle"></b><span>カメラに顔を向けて「撮影する」を押してね</span><button type="button" id="gBarShot" class="shot">📷 撮影する</button><button type="button" id="gBarCancel">キャンセル</button></div>
 
 <div class="overlay" id="overlay">
   <div class="count" id="spinner" hidden></div>
@@ -181,7 +208,7 @@ function near(text, ratio){
   if (candCount >= 2) { candCount = 0; onCode(text); }
 }
 function onCode(text){
-    if (busy) return;
+    if (busy || nameMode) return;
     var now = Date.now();
     if (text === lastText && now - lastTime < 6000) return;
     lastText = text; lastTime = now;
@@ -276,6 +303,80 @@ function onCode(text){
     if (isIn) { beep(784, .18); beep(1047, .3, .16); }
     else { beep(1047, .18); beep(784, .3, .16); }
   }
+  // ===== 名前で入室・退室（QRなし） =====
+  var N = null, nameMode = false, nIdle = null, nTimer = null, KIDS = null;
+  function nEsc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function nNorm(s){ return String(s || '').normalize('NFKC').replace(/[\s　]/g, '').replace(/[ァ-ヶ]/g, function(c){ return String.fromCharCode(c.charCodeAt(0) - 0x60); }).toLowerCase(); }
+  function nPanel(html){ var p = document.getElementById('gPanel'); p.innerHTML = html; p.classList.add('show'); clearTimeout(nIdle); nIdle = setTimeout(nCancel, 90000); }
+  function nClose(){ document.getElementById('gPanel').classList.remove('show'); clearTimeout(nIdle); var a = document.activeElement; if (a && a.blur) a.blur(); }
+  function nBarEnd(){ nameMode = false; clearTimeout(nTimer); document.getElementById('gBar').classList.remove('show'); }
+  function nCancel(){ nClose(); nBarEnd(); N = null; busy = false; lastText = ''; }
+  function loadKids(cb){
+    fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kids_list', key:KEY }) })
+      .then(function(r){ return r.json(); })
+      .then(function(r){ if (r && r.ok) KIDS = r.list; if (cb) cb(); })
+      .catch(function(){ if (cb) cb(); });
+  }
+  function nStart(){
+    if (busy) return;
+    busy = true; N = { act:'', no:'', name:'' }; KIDS = null; loadKids();
+    nPanel('<h2>名前で受付</h2><p class="gnote">来たとき？帰るとき？</p>'
+      + '<div class="ggrid"><button type="button" class="in" data-act="in">来た<br>（入室）</button><button type="button" class="out" data-act="out">帰る<br>（退室）</button></div>'
+      + '<div class="row"><button type="button" data-cancel>やめる</button></div>');
+  }
+  function nPick(){
+    nPanel('<h2>' + (N.act === 'in' ? '入室' : '退室') + '：自分の名前をえらんでね</h2>'
+      + '<input id="nQ" placeholder="名前の さいしょの文字（ひらがなでもOK）" autocomplete="off">'
+      + '<div class="glist" id="nList"><p class="gnote">読み込み中…</p></div>'
+      + '<div class="row"><button type="button" data-back>もどる</button><button type="button" data-cancel>やめる</button></div>');
+    var q = document.getElementById('nQ');
+    q.addEventListener('input', function(){ clearTimeout(nIdle); nIdle = setTimeout(nCancel, 90000); nRender(); });
+    if (KIDS) nRender(); else loadKids(nRender);
+  }
+  function nRender(){
+    var el = document.getElementById('nList'); if (!el) return;
+    if (!KIDS) { el.innerHTML = '<p class="gnote">名前を読みこめませんでした。スタッフに声をかけてね</p>'; return; }
+    var q = nNorm((document.getElementById('nQ') || {}).value);
+    var list = KIDS.filter(function(k){ return !q || nNorm(k.name).indexOf(q) >= 0 || nNorm(k.kana).indexOf(q) >= 0; });
+    if (N.act === 'out' && !q) list = list.filter(function(k){ return k.in; });
+    list.sort(function(a, b){ return nNorm(a.kana || a.name) < nNorm(b.kana || b.name) ? -1 : 1; });
+    el.innerHTML = list.length ? list.map(function(k){
+      return '<button type="button" class="' + (k.in ? 'here' : '') + '" data-no="' + nEsc(k.no) + '" data-name="' + nEsc(k.name) + '">' + nEsc(k.name)
+        + '<small>' + nEsc(k.school || '') + (k.in ? '　🟢 いま入室中' : '') + '</small></button>';
+    }).join('') : '<p class="gnote">' + (N.act === 'out' && !q ? 'いま入室中の人はいません。上に名前を入れてさがしてね' : 'みつかりません。会員登録がまだかも。スタッフに声をかけてね') + '</p>';
+  }
+  function nCamera(){
+    nClose();
+    document.getElementById('gBarTitle').textContent = N.name + 'さん：顔が見えるように写真に写ってね';
+    document.getElementById('gBar').classList.add('show');
+    nameMode = true; busy = false; lastText = '';
+    clearTimeout(nTimer); nTimer = setTimeout(nCancel, 60000);
+  }
+  function nShoot(){
+    if (!nameMode || busy || !N) return;
+    var n = N;
+    nBarEnd();
+    busy = true; beep(880, .12);
+    show('wait', 'そのまま カメラを見てね', '', '', '', true);
+    setTimeout(function(){
+      var photo = capture();
+      document.getElementById('oMsg').textContent = '送信中…';
+      fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'checkin_name', key:KEY, no:n.no, act:n.act, photo:photo }) })
+        .then(function(r){ return r.json(); })
+        .then(function(r){ N = null; result(r); })
+        .catch(function(){ N = null; beep(220, .3); show('err', '通信できませんでした', '', 'もう一度ためしてください', ''); setTimeout(reset, 3000); });
+    }, 1400);
+  }
+  document.getElementById('nameBtn').onclick = nStart;
+  document.getElementById('gBarShot').onclick = nShoot;
+  document.getElementById('gBarCancel').onclick = nCancel;
+  document.getElementById('gPanel').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b || !N) return;
+    if (b.hasAttribute('data-cancel')) return nCancel();
+    if (b.hasAttribute('data-back')) { busy = false; return nStart(); }
+    if (b.dataset.act) { N.act = b.dataset.act; return nPick(); }
+    if (b.dataset.no) { N.no = b.dataset.no; N.name = b.dataset.name; return nCamera(); }
+  });
 </script>
 </body>
 </html>
