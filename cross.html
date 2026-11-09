@@ -87,6 +87,13 @@
   .gbar b{font-size:clamp(20px,3vw,38px);font-weight:900}
   .gbar span{font-size:clamp(14px,1.8vw,22px);font-weight:700;opacity:.9}
   .gbar button{font:inherit;font-weight:900;border:0;border-radius:999px;cursor:pointer;font-size:clamp(16px,2vw,24px);padding:1vh 3vw;background:#fff;color:#12344D}
+  .gpanel .glist button.gst{grid-column:1/-1;text-align:center;background:#FFF4D6;border-color:#E9861C;border-style:dashed}
+  .gpanel .grades{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1vh 1vw;width:100%;max-width:900px}
+  .gpanel .grades button{font:inherit;font-weight:900;font-size:clamp(16px,2vw,24px);padding:1.4vh 0;border-radius:14px;border:3px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer}
+  .gpanel .grades button.on{background:var(--ink);color:#fff}
+  .gpanel .two{display:grid;grid-template-columns:1fr 1fr;gap:2vw;width:100%;max-width:900px}
+  .gpanel .row button.next{background:var(--in);border-color:var(--in);color:#fff}
+  .gpanel .row button:disabled{opacity:.4}
   .gbar button.shot{background:var(--in);color:#fff;font-size:clamp(24px,3.4vw,42px);padding:1.6vh 6vw}
 </style>
 </head>
@@ -337,13 +344,29 @@ function onCode(text){
     var el = document.getElementById('nList'); if (!el) return;
     if (!KIDS) { el.innerHTML = '<p class="gnote">名前を読みこめませんでした。スタッフに声をかけてね</p>'; return; }
     var q = nNorm((document.getElementById('nQ') || {}).value);
-    var list = KIDS.filter(function(k){ return !q || nNorm(k.name).indexOf(q) >= 0 || nNorm(k.kana).indexOf(q) >= 0; });
+    var list = KIDS.filter(function(k){ return (N.act === 'out' || !k.guest) && (!q || nNorm(k.name).indexOf(q) >= 0 || nNorm(k.kana).indexOf(q) >= 0); });
     if (N.act === 'out' && !q) list = list.filter(function(k){ return k.in; });
     list.sort(function(a, b){ return nNorm(a.kana || a.name) < nNorm(b.kana || b.name) ? -1 : 1; });
     el.innerHTML = list.length ? list.map(function(k){
       return '<button type="button" class="' + (k.in ? 'here' : '') + '" data-no="' + nEsc(k.no) + '" data-name="' + nEsc(k.name) + '">' + nEsc(k.name)
         + '<small>' + nEsc(k.school || '') + (k.in ? '　🟢 いま入室中' : '') + '</small></button>';
-    }).join('') : '<p class="gnote">' + (N.act === 'out' && !q ? 'いま入室中の人はいません。上に名前を入れてさがしてね' : 'みつかりません。会員登録がまだかも。スタッフに声をかけてね') + '</p>';
+    }).join('') : '<p class="gnote">' + (N.act === 'out' && !q ? 'いま入室中の人はいません。上に名前を入れてさがしてね' : 'みつかりません') + '</p>';
+    if (N.act === 'in') el.innerHTML += '<button type="button" class="gst" data-guest>名前がない（はじめての人・登録がまだの人）</button>';
+  }
+  var GRADES = ['小1','小2','小3','小4','小5','小6','中1','中2','中3','高1','高2','高3','その他'];
+  function nGuest(){
+    N.guest = true; N.grade = ''; N.no = '';
+    nPanel('<h2>はじめての人：フルネームを入れてね</h2>'
+      + '<div class="two"><input id="gSei" maxlength="12" placeholder="名字（れい：やまだ）" autocomplete="off"><input id="gMei" maxlength="12" placeholder="名前（れい：たろう）" autocomplete="off"></div>'
+      + '<p class="gnote">学年をえらんでね</p><div class="grades">' + GRADES.map(function(g){ return '<button type="button" data-grade="' + g + '">' + g + '</button>'; }).join('') + '</div>'
+      + '<div class="row"><button type="button" data-back>もどる</button><button type="button" data-cancel>やめる</button><button type="button" class="next" id="gNext" disabled>次へ</button></div>');
+    ['gSei','gMei'].forEach(function(id){ document.getElementById(id).addEventListener('input', nGuestChk); });
+    setTimeout(function(){ document.getElementById('gSei').focus(); }, 100);
+  }
+  function nGuestChk(){
+    clearTimeout(nIdle); nIdle = setTimeout(nCancel, 90000);
+    var ok = document.getElementById('gSei').value.trim() && document.getElementById('gMei').value.trim() && N.grade;
+    document.getElementById('gNext').disabled = !ok;
   }
   function nCamera(){
     nClose();
@@ -361,9 +384,18 @@ function onCode(text){
     setTimeout(function(){
       var photo = capture();
       document.getElementById('oMsg').textContent = '送信中…';
-      fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'checkin_name', key:KEY, no:n.no, act:n.act, photo:photo }) })
+      var body = n.guest ? { action:'guest_checkin', key:KEY, act:n.act, name:n.name, grade:n.grade, gid:n.no, photo:photo } : { action:'checkin_name', key:KEY, no:n.no, act:n.act, photo:photo };
+      fetch(GAS_URL, { method:'POST', body: JSON.stringify(body) })
         .then(function(r){ return r.json(); })
-        .then(function(r){ N = null; result(r); })
+        .then(function(r){
+          N = null;
+          if (r && r.ok && r.guest && !r.duplicate) {
+            chime(r.action === '入室');
+            show(r.action === '入室' ? 'in' : 'out', r.action === '入室' ? 'ようこそ！' : 'おつかれさま！', r.name + 'さん', r.action + ' ' + r.time,
+              '次からは会員登録してね。スタッフから「登録のしかた」の紙をもらって、おうちの人にわたしてね');
+            setTimeout(reset, 7000);
+          } else result(r);
+        })
         .catch(function(){ N = null; beep(220, .3); show('err', '通信できませんでした', '', 'もう一度ためしてください', ''); setTimeout(reset, 3000); });
     }, 1400);
   }
@@ -375,7 +407,10 @@ function onCode(text){
     if (b.hasAttribute('data-cancel')) return nCancel();
     if (b.hasAttribute('data-back')) { busy = false; return nStart(); }
     if (b.dataset.act) { N.act = b.dataset.act; return nPick(); }
-    if (b.dataset.no) { N.no = b.dataset.no; N.name = b.dataset.name; return nCamera(); }
+    if (b.hasAttribute('data-guest')) return nGuest();
+    if (b.dataset.grade) { N.grade = b.dataset.grade; [].forEach.call(document.querySelectorAll('.grades button'), function(x){ x.className = x === b ? 'on' : ''; }); return nGuestChk(); }
+    if (b.id === 'gNext') { N.name = document.getElementById('gSei').value.trim() + ' ' + document.getElementById('gMei').value.trim(); return nCamera(); }
+    if (b.dataset.no) { N.no = b.dataset.no; N.name = b.dataset.name; N.guest = /^G/.test(N.no); return nCamera(); }
   });
 </script>
 </body>
