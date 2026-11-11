@@ -99,6 +99,7 @@
   var INVOICE_URL = 'https://subschool0829.github.io/subsc/invoice.html#t=';
   var KEY = ''; try { KEY = localStorage.getItem('subsc_mkey') || ''; } catch(e){}
   var MONTH = (location.hash.match(/(\d{4}-\d{2})/) || [])[1] || '';
+  var ONLY = (location.hash.match(/id=([\w-]+)/) || [])[1] || '';
   var R = null;
   var WD = ['日','月','火','水','木','金','土'];
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
@@ -161,7 +162,7 @@
   function render(){
     if (!R) return;
     var all = document.getElementById('showDraft').checked;
-    var list = R.list.filter(function(b){ return all || b.status !== '下書き'; });
+    var list = R.list.filter(function(b){ return (all || b.status !== '下書き') && (!ONLY || b.id === ONLY); });
     var drafts = R.list.filter(function(b){ return b.status === '下書き'; }).length;
     document.getElementById('cnt').textContent = list.length + '家庭・' + (list.length * 2) + 'ページ（両面印刷で1家庭1枚）' + (drafts && !all ? '　※下書き ' + drafts + '件は表示していません（先に確定してください）' : '');
     document.getElementById('pages').innerHTML = list.map(function(b){ return invoicePage(b) + guidePage(b); }).join('');
