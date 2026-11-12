@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{--ink:#1A1A1A;--sub:#5E5E5E;--line:#E4E0D3;--yellow:#F7CE2E;--tint:#FFF5CC;--soft:#F7F6F2;--bg:#fff;
-    --shift:#FFF5CC;--lesson:#E3F1EA;--lessonInk:#0F6E56;--event:#E8EEF8;--eventInk:#28497A;--warn:#B3261E;--warnBg:#FCEBEB}
+    --shift:#FFF5CC;--lesson:#E3F1EA;--lessonInk:#0F6E56;--event:#ECECEC;--eventInk:#555;--warn:#B3261E;--warnBg:#FCEBEB}
   *{box-sizing:border-box;margin:0;padding:0}
   [hidden]{display:none!important}
   body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif;color:var(--ink);background:var(--soft);line-height:1.6;font-size:16px;font-weight:500;padding-bottom:84px}
@@ -114,6 +114,15 @@
   .tlles.kouza{background:#534AB7}
 .tlles.kouza{padding:0 1px;font-size:10px;letter-spacing:-.06em;text-overflow:clip;text-align:center}
   .item.lesson.kouza{background:#EEEDFE;color:#3C3489}
+  /* 担当で色分け：Kento＝緑、Seiwa＝紫、そのほか＝グレー */
+  .item.lesson.mk{background:#E3F1EA;color:#0F6E56}
+  .item.lesson.ms{background:#EEEDFE;color:#3C3489}
+  .item.lesson.mo{background:#ECECEC;color:#555}
+  .tlles.mk{background:#0F6E56}
+  .tlles.ms{background:#534AB7}
+  .tlles.mo{background:#8A8A8A}
+  .tlev{background:#9E9E9E;color:#fff}
+  .item.lesson.cancel{background:var(--soft);color:var(--sub);text-decoration:line-through}
   .tlles.cancel{background:#BDBDBD;text-decoration:line-through}
   .tlles.warnb{box-shadow:0 0 0 2px var(--warn)}
   .tlev{background:var(--event);color:var(--eventInk);box-shadow:inset 0 0 0 1px var(--eventInk)}
@@ -153,7 +162,7 @@
       <button class="btn" id="nextW" aria-label="次の週">▶</button>
     </div>
     <div class="row" style="margin-bottom:8px">
-      <div class="legend"><span><i style="background:var(--shift)"></i>在室予定</span><span><i style="background:var(--lesson)"></i>授業</span><span><i style="background:#EEEDFE"></i>講座</span><span><i style="background:var(--event)"></i>行事</span></div>
+      <div class="legend"><span><i style="background:var(--shift)"></i>在室予定</span><span><i style="background:#E3F1EA"></i>Kento 授業・講座</span><span><i style="background:#EEEDFE"></i>Seiwa 授業・講座</span><span><i style="background:var(--event)"></i>行事・その他</span></div>
       <div style="display:flex;gap:6px;align-items:center"><div class="vseg" id="vseg" role="group" aria-label="表示"><button data-v="list">リスト</button><button data-v="time">時間軸</button></div><button class="btn" id="todayBtn">今日</button></div>
     </div>
     <div id="days"></div>
@@ -419,7 +428,7 @@
         } else if (it.k === 'lesson') {
           var cancel = o.status !== '予定';
           var ws = cancel ? [] : lessonWarnings(o);
-          html += '<button class="item lesson' + (o.kind === '講座' ? ' kouza' : '') + (cancel ? ' cancel' : '') + '" data-lesson="' + o.id + '"><span class="t">' + o.start + '〜' + o.end + '</span>' + (o.kind === '講座' ? '講座　' : '授業　') + esc(o.title || o.names)
+          html += '<button class="item lesson' + (o.kind === '講座' ? ' kouza' : '') + mcls(o) + (cancel ? ' cancel' : '') + '" data-lesson="' + o.id + '"><span class="t">' + o.start + '〜' + o.end + '</span>' + (o.kind === '講座' ? '講座　' : '授業　') + esc(o.title || o.names)
             + (o.kind === '講座' ? '<span class="tag">' + (o.ktype === '有料' ? '有料 ' + o.fee.toLocaleString() + '円' : '無料') + '</span>' : '') + (o.count >= 2 ? '<span class="tag">' + o.count + '人</span>' : '') + (cancel ? '<span class="tag">' + esc(o.status) + '</span>' : '')
             + '<small>' + (o.content ? esc(o.content) + '　' : '') + '担当：' + esc(o.mentor || '未定') + '</small>'
             + ws.map(function(x){ return '<span class="warn">⚠ ' + esc(x) + '</span>'; }).join('') + '</button>';
@@ -483,7 +492,7 @@
         D.shifts.filter(function(s){ return s.date === d && s.mentorId === m.id; }).forEach(function(s){ html += '<div class="tlshift" style="' + pos(s.start, s.end) + '"></div>'; });
         lessonsDay.filter(function(l){ return (l.mentorId || '') === m.id; }).forEach(function(l){
           var cancel = l.status !== '予定', warn = !cancel && lessonWarnings(l).length;
-          html += '<button class="tlles' + (l.kind === '講座' ? ' kouza' : '') + (cancel ? ' cancel' : '') + (warn ? ' warnb' : '') + '" data-lesson="' + l.id + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + (l.title || l.names)) + '">' + (l.kind === '講座' ? esc(kshort(l)) : l.start + ' ' + esc(l.title || l.names)) + '</button>';
+          html += '<button class="tlles' + (l.kind === '講座' ? ' kouza' : '') + mcls(l) + (cancel ? ' cancel' : '') + (warn ? ' warnb' : '') + '" data-lesson="' + l.id + '" style="' + pos(l.start, l.end) + '" title="' + esc(l.start + '〜' + l.end + ' ' + (l.title || l.names)) + '">' + (l.kind === '講座' ? esc(kshort(l)) : l.start + ' ' + esc(l.title || l.names)) + '</button>';
         });
         if (m.id) evsDay.filter(function(e){ return e.mentorId === m.id; }).forEach(function(e){ html += evBtn(e); });
         html += '</div></div>';
@@ -525,6 +534,7 @@
       .then(function(){ closeModal(); toast(msg); return load(); })
       .catch(function(err){ toast(err.message); btn.disabled = false; });
   }
+  function mcls(x){ var n = String(x.mentor || (x.mentorId ? mentorName(x.mentorId) : '') || '').toLowerCase(); return /kento/.test(n) ? ' mk' : /seiwa/.test(n) ? ' ms' : ' mo'; }
   function mentorName(id){ var m = find(D.mentors, id); return m ? m.name : '担当未定'; }
   function trackAt(x, y){ var el = document.elementFromPoint(x, y); return el ? el.closest('[data-track]') : null; }
   function clearDrop(){ [].forEach.call(document.querySelectorAll('.droptarget'), function(el){ el.classList.remove('droptarget'); }); }
