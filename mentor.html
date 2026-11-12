@@ -52,6 +52,22 @@
   nav.tabbar button{flex:1;border:0;background:none;padding:10px 0 12px;font-weight:700;font-size:13px;color:var(--sub);cursor:pointer}
   nav.tabbar button[aria-current]{color:var(--ink);box-shadow:inset 0 4px 0 var(--yellow)}
   .panel{display:none}.panel.on{display:block}
+  /* 月の予定（カレンダー） */
+  .cm{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--bg);border-radius:14px;overflow:hidden}
+  .cm .wd{text-align:center;font-size:12px;font-weight:700;padding:6px 0;color:var(--sub);border-bottom:1px solid var(--line)}
+  .cm .wd.su,.cm .c.su .n{color:#C0392B}
+  .cm .wd.sa,.cm .c.sa .n{color:#2E6DB4}
+  .cm .c{min-height:96px;border-bottom:1px solid var(--line);padding:3px 2px 4px;cursor:pointer;min-width:0;overflow:hidden}
+  .cm .c.out{background:var(--soft);cursor:default}
+  .cm .c .n{display:block;text-align:center;font-size:13px;font-weight:700;margin-bottom:1px}
+  .cm .c.today .n span{background:var(--ink);color:#fff;border-radius:999px;padding:0 6px}
+  .cm .ch{display:block;font-size:10px;line-height:1.4;border-radius:4px;padding:1px 3px;margin-top:2px;white-space:nowrap;overflow:hidden;font-weight:700;color:#fff}
+  .cm .ch.sh{background:#F7CE2E;color:#1A1A1A}
+  .cm .ch.mk{background:#2E9E6E}
+  .cm .ch.ms{background:#6B5FD3}
+  .cm .ch.mo{background:#9E9E9E}
+  .cm .more{display:block;font-size:10px;color:var(--sub);text-align:center;margin-top:1px}
+  @media (min-width:700px){ .cm .ch{font-size:11px} .cm .c{min-height:120px} }
   .card{background:var(--bg);border-radius:14px;padding:14px 16px;margin-bottom:10px}
   h2{font-size:18px;font-weight:900;margin:6px 0 10px}
   .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -163,11 +179,25 @@
     </div>
     <div class="row" style="margin-bottom:8px">
       <div class="legend"><span><i style="background:var(--shift)"></i>在室予定</span><span><i style="background:#E3F1EA"></i>Kento 授業・講座</span><span><i style="background:#EEEDFE"></i>Seiwa 授業・講座</span><span><i style="background:var(--event)"></i>行事・その他</span></div>
-      <div style="display:flex;gap:6px;align-items:center"><div class="vseg" id="vseg" role="group" aria-label="表示"><button data-v="list">リスト</button><button data-v="time">時間軸</button></div><button class="btn" id="todayBtn">今日</button></div>
+      <div style="display:flex;gap:6px;align-items:center"><div class="vseg" id="vseg" role="group" aria-label="表示"><button data-v="list">リスト</button><button data-v="time">時間軸</button><button data-v="month">月</button></div><button class="btn" id="todayBtn">今日</button></div>
     </div>
     <div id="days"></div>
   </section>
 
+  <section class="panel" id="p-cal">
+    <div class="weeknav">
+      <button class="btn" id="cmPrev" aria-label="前の月">◀</button>
+      <b id="cmLabel"></b>
+      <button class="btn" id="cmNext" aria-label="次の月">▶</button>
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <div class="vseg" id="cmWho" role="group" aria-label="だれの予定"><button data-w="">全員</button><button data-w="seiwa">Seiwa</button><button data-w="kento">Kento</button></div>
+      <button class="btn" id="cmBack">週の予定へ</button>
+    </div>
+    <div class="legend" style="margin-bottom:8px"><span><i style="background:#F7CE2E"></i>在室</span><span><i style="background:#2E9E6E"></i>Kento</span><span><i style="background:#6B5FD3"></i>Seiwa</span><span><i style="background:#9E9E9E"></i>行事・その他</span></div>
+    <div id="cmGrid"><div class="loading">読み込み中…</div></div>
+    <p class="muted" style="font-size:12px;margin-top:6px">日付を押すと、その日の予定がすべて見られます。</p>
+  </section>
   <section class="panel" id="p-req">
     <p class="muted">生徒・保護者は、公式LINEで「授業」と送ると届く専用ページから申し込みます。受付・変更依頼・差し戻し・却下・メッセージは、公式LINEで本人に届きます。生徒・保護者からの返信もここに表示されます。</p>
     <div id="reqList"><div class="loading">読み込み中…</div></div>
@@ -519,6 +549,7 @@
   function syncVseg(){ [].forEach.call(document.querySelectorAll('#vseg button'), function(b){ b.setAttribute('aria-pressed', b.dataset.v === VIEW ? 'true' : 'false'); }); }
   document.getElementById('vseg').onclick = function(ev){
     var b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.v === 'month') { showPanel('cal'); return; }
     VIEW = b.dataset.v; try { localStorage.setItem('subsc_view', VIEW); } catch(e){}
     syncVseg(); if (D) renderWeek();
   };
@@ -1719,6 +1750,73 @@
   });
 
   function isFreeM(m){ return !!m && String(m.name).trim().toLowerCase() === 'free'; }
+  // ===== 月の予定（LINEカレンダー風） =====
+  var CM = { ym: null, who: '', data: null };
+  try { CM.who = localStorage.getItem('subsc_cmwho') || ''; } catch(e){}
+  function cmHs(t){ var p = String(t || '').split(':'); return (+p[0]) + (p[1] && p[1] !== '00' ? ':' + p[1] : ''); }
+  function cmMatch(id){ return !CM.who || new RegExp(CM.who, 'i').test(mentorName(id)); }
+  function cmSync(){ [].forEach.call(document.querySelectorAll('#cmWho button'), function(b){ b.setAttribute('aria-pressed', b.dataset.w === CM.who ? 'true' : 'false'); }); }
+  function calOpen(){ if (!D) return; if (!CM.ym) CM.ym = D.today.slice(0, 7); cmSync(); calLoad(); }
+  function calLoad(){
+    var ym = CM.ym, p = ym.split('-'), y = +p[0], m = +p[1];
+    document.getElementById('cmLabel').textContent = y + '年' + m + '月';
+    var days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    if (!CM.data || CM.data.ym !== ym) document.getElementById('cmGrid').innerHTML = '<div class="loading">読み込み中…</div>';
+    api('sch_load', { from: ym + '-01', days: days }).then(function(r){
+      if (ym !== CM.ym) return;
+      r.ym = ym; CM.data = r; calRender();
+    }).catch(function(e){ document.getElementById('cmGrid').innerHTML = '<div class="card muted">' + esc(e.message) + '</div>'; });
+  }
+  // その日の予定（短い表示 s と、くわしい表示 l）
+  function calItems(d){
+    var R = CM.data, it = [];
+    (R.shifts || []).filter(function(x){ return x.date === d && cmMatch(x.mentorId); }).forEach(function(x){
+      var nm = mentorName(x.mentorId);
+      it.push({ o: 0, t: x.start, c: 'sh', s: (CM.who ? '在室 ' : nm.charAt(0) + ' ') + cmHs(x.start) + '-' + cmHs(x.end), l: x.start + '〜' + x.end + '　在室　' + nm + (x.memo ? '（' + x.memo + '）' : '') });
+    });
+    (R.lessons || []).filter(function(x){ return x.date === d && x.status !== '取消' && cmMatch(x.mentorId); }).forEach(function(x){
+      var nm = x.kind === '講座' ? (x.title || '講座') : (x.names || '授業');
+      it.push({ o: 1, t: x.start, c: mcls(x).trim(), s: cmHs(x.start) + ' ' + nm, l: x.start + '〜' + x.end + '　' + (x.kind === '講座' ? '講座' : '授業') + '　' + nm + '（' + mentorName(x.mentorId) + '）' });
+    });
+    (R.events || []).filter(function(x){ return x.date === d && !x.off && (!x.mentorId || cmMatch(x.mentorId)); }).forEach(function(x){
+      it.push({ o: 1, t: x.start || '', c: 'mo', s: evText(x), l: (x.start ? x.start + '〜' + x.end + '　' : '') + evText(x) });
+    });
+    return it.sort(function(a, b){ return a.o - b.o || (a.t < b.t ? -1 : a.t > b.t ? 1 : 0); });
+  }
+  function calRender(){
+    var ym = CM.ym, p = ym.split('-'), y = +p[0], m = +p[1];
+    var first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    var cells = Math.ceil((first + days) / 7) * 7, MAX = 5;
+    var h = '<div class="cm">' + ['日','月','火','水','木','金','土'].map(function(w, i){ return '<div class="wd' + (i === 0 ? ' su' : i === 6 ? ' sa' : '') + '">' + w + '</div>'; }).join('');
+    for (var i = 0; i < cells; i++) {
+      var n = i - first + 1, wd = i % 7, cls = wd === 0 ? ' su' : wd === 6 ? ' sa' : '';
+      if (n < 1 || n > days) { h += '<div class="c out"></div>'; continue; }
+      var d = ym + '-' + ('0' + n).slice(-2), it = calItems(d);
+      h += '<div class="c' + cls + (d === D.today ? ' today' : '') + '" data-cd="' + d + '"><span class="n"><span>' + n + '</span></span>'
+        + it.slice(0, MAX).map(function(x){ return '<span class="ch ' + x.c + '">' + esc(x.s) + '</span>'; }).join('')
+        + (it.length > MAX ? '<span class="more">ほか' + (it.length - MAX) + '件</span>' : '') + '</div>';
+    }
+    document.getElementById('cmGrid').innerHTML = h + '</div>';
+  }
+  document.getElementById('cmPrev').onclick = function(){ CM.ym = ymNext(CM.ym, -1); calLoad(); };
+  document.getElementById('cmNext').onclick = function(){ CM.ym = ymNext(CM.ym, 1); calLoad(); };
+  document.getElementById('cmBack').onclick = function(){ showPanel('week'); };
+  document.getElementById('cmWho').onclick = function(ev){
+    var b = ev.target.closest('button'); if (!b) return;
+    CM.who = b.dataset.w; try { localStorage.setItem('subsc_cmwho', CM.who); } catch(e){}
+    cmSync(); if (CM.data) calRender();
+  };
+  document.getElementById('cmGrid').addEventListener('click', function(ev){
+    var c = ev.target.closest('[data-cd]'); if (!c || !CM.data) return;
+    var d = c.dataset.cd, p = d.split('-'), wd = '日月火水木金土'.charAt(new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay());
+    var it = calItems(d);
+    openModal('<h2>' + (+p[1]) + '/' + (+p[2]) + '（' + wd + '）の予定</h2>'
+      + (CM.who ? '<p class="muted" style="font-size:12px">' + esc(CM.who === 'seiwa' ? 'Seiwa' : 'Kento') + 'の予定だけ表示しています</p>' : '')
+      + (it.length ? it.map(function(x){ return '<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)"><i style="flex:none;width:10px;height:10px;border-radius:3px;margin-top:6px;background:' + ({ sh: '#F7CE2E', mk: '#2E9E6E', ms: '#6B5FD3', mo: '#9E9E9E' }[x.c] || '#9E9E9E') + '"></i><span>' + esc(x.l) + '</span></div>'; }).join('') : '<p class="muted" style="margin-top:8px">予定はありません</p>')
+      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">閉じる</button><button class="btn pri" id="cmToWeek">週の予定で開く</button></div></div>');
+    document.getElementById('cmToWeek').onclick = function(){ closeModal(); weekFrom = d; showPanel('week'); load(); };
+  });
+
   function showPanel(p){
     [].forEach.call(document.querySelectorAll('.panel'), function(el){ el.classList.toggle('on', el.id === 'p-' + p); });
     [].forEach.call(document.querySelectorAll('#tabbar button'), function(b){ if (b.dataset.p === p) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -1726,6 +1824,7 @@
     if (p === 'room') loadRoom();
     if (p === 'events') loadBoard();
     if (p === 'events') loadMonth();
+    if (p === 'cal') { document.querySelector('#tabbar [data-p="week"]').setAttribute('aria-current', 'page'); calOpen(); }
   }
   document.getElementById('tabbar').addEventListener('click', function(ev){ var b = ev.target.closest('button'); if (b) showPanel(b.dataset.p); });
 
