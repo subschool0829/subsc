@@ -657,7 +657,7 @@
   function toast(t){ var el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function(){ el.classList.remove('on'); }, 2400); }
   function save(action, data, msg, btn){
     if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
-    return api(action, data).then(function(r){ closeModal(); toast(msg || '保存しました'); if (r && r.notice) setTimeout(function(){ alert(r.notice); }, 60); return load(); })
+    return api(action, data).then(function(r){ closeModal(); toast(msg || '保存しました'); if (r && r.notice) setTimeout(function(){ alert(r.notice); }, 60); if (document.getElementById('p-cal').classList.contains('on')) calLoad(); return load(); })
       .catch(function(e){ toast(e.message); if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || '保存'; } });
   }
   function confirmDel(text, action, data){
@@ -1772,16 +1772,25 @@
     var R = CM.data, it = [];
     (R.shifts || []).filter(function(x){ return x.date === d && cmMatch(x.mentorId); }).forEach(function(x){
       var nm = mentorName(x.mentorId);
-      it.push({ o: 0, t: x.start, c: 'sh', s: (CM.who ? '在室 ' : nm.charAt(0) + ' ') + cmHs(x.start) + '-' + cmHs(x.end), l: x.start + '〜' + x.end + '　在室　' + nm + (x.memo ? '（' + x.memo + '）' : '') });
+      it.push({ r: { k: 's', o: x }, o: 0, t: x.start, c: 'sh', s: (CM.who ? '在室 ' : nm.charAt(0) + ' ') + cmHs(x.start) + '-' + cmHs(x.end), l: x.start + '〜' + x.end + '　在室　' + nm + (x.memo ? '（' + x.memo + '）' : '') });
     });
     (R.lessons || []).filter(function(x){ return x.date === d && x.status !== '取消' && cmMatch(x.mentorId); }).forEach(function(x){
       var nm = x.kind === '講座' ? (x.title || '講座') : (x.names || '授業');
-      it.push({ o: 1, t: x.start, c: mcls(x).trim(), s: cmHs(x.start) + ' ' + nm, l: x.start + '〜' + x.end + '　' + (x.kind === '講座' ? '講座' : '授業') + '　' + nm + '（' + mentorName(x.mentorId) + '）' });
+      it.push({ r: { k: 'l', o: x }, o: 1, t: x.start, c: mcls(x).trim(), s: cmHs(x.start) + ' ' + nm, l: x.start + '〜' + x.end + '　' + (x.kind === '講座' ? '講座' : '授業') + '　' + nm + '（' + mentorName(x.mentorId) + '）' });
     });
     (R.events || []).filter(function(x){ return x.date === d && !x.off && (!x.mentorId || cmMatch(x.mentorId)); }).forEach(function(x){
-      it.push({ o: 1, t: x.start || '', c: 'mo', s: evText(x), l: (x.start ? x.start + '〜' + x.end + '　' : '') + evText(x) });
+      it.push({ r: { k: 'e', o: x }, o: 1, t: x.start || '', c: 'mo', s: evText(x), l: (x.start ? x.start + '〜' + x.end + '　' : '') + evText(x) });
     });
     return it.sort(function(a, b){ return a.o - b.o || (a.t < b.t ? -1 : a.t > b.t ? 1 : 0); });
+  }
+  // 月の予定から、その予定の変更画面を開く（保存・削除すると月の表示も更新）
+  function calEdit(x){
+    if (!x || !x.r) return;
+    if (x.r.k === 's') return shiftForm(x.r.o);
+    if (x.r.k === 'l') return lessonForm(x.r.o);
+    // 行事の画面は週のデータから探すので、表示中の週にない日は一時的に足す
+    if (!D.events.some(function(e){ return e.id === x.r.o.id && e.date === x.r.o.date; })) D.events.push(x.r.o);
+    return eventDayMenu(x.r.o.id, x.r.o.date);
   }
   function calRender(){
     var ym = CM.ym, p = ym.split('-'), y = +p[0], m = +p[1];
@@ -1793,7 +1802,7 @@
       if (n < 1 || n > days) { h += '<div class="c out"></div>'; continue; }
       var d = ym + '-' + ('0' + n).slice(-2), it = calItems(d);
       h += '<div class="c' + cls + (d === D.today ? ' today' : '') + '" data-cd="' + d + '"><span class="n"><span>' + n + '</span></span>'
-        + it.slice(0, MAX).map(function(x){ return '<span class="ch ' + x.c + '">' + esc(x.s) + '</span>'; }).join('')
+        + it.slice(0, MAX).map(function(x, k){ return '<span class="ch ' + x.c + '" data-ci="' + k + '">' + esc(x.s) + '</span>'; }).join('')
         + (it.length > MAX ? '<span class="more">ほか' + (it.length - MAX) + '件</span>' : '') + '</div>';
     }
     document.getElementById('cmGrid').innerHTML = h + '</div>';
@@ -1808,12 +1817,17 @@
   };
   document.getElementById('cmGrid').addEventListener('click', function(ev){
     var c = ev.target.closest('[data-cd]'); if (!c || !CM.data) return;
+    var ci = ev.target.closest('[data-ci]');
+    if (ci) { var hit = calItems(c.dataset.cd)[+ci.dataset.ci]; if (hit) return calEdit(hit); }
     var d = c.dataset.cd, p = d.split('-'), wd = '日月火水木金土'.charAt(new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay());
     var it = calItems(d);
     openModal('<h2>' + (+p[1]) + '/' + (+p[2]) + '（' + wd + '）の予定</h2>'
       + (CM.who ? '<p class="muted" style="font-size:12px">' + esc(CM.who === 'seiwa' ? 'Seiwa' : 'Kento') + 'の予定だけ表示しています</p>' : '')
-      + (it.length ? it.map(function(x){ return '<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)"><i style="flex:none;width:10px;height:10px;border-radius:3px;margin-top:6px;background:' + ({ sh: '#F7CE2E', mk: '#2E9E6E', ms: '#6B5FD3', mo: '#9E9E9E' }[x.c] || '#9E9E9E') + '"></i><span>' + esc(x.l) + '</span></div>'; }).join('') : '<p class="muted" style="margin-top:8px">予定はありません</p>')
-      + '<div class="acts"><div class="r"><button class="btn" onclick="closeModal()">閉じる</button><button class="btn pri" id="cmToWeek">週の予定で開く</button></div></div>');
+      + (it.length ? it.map(function(x, k){ return '<div data-mi="' + k + '" style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer"><i style="flex:none;width:10px;height:10px;border-radius:3px;margin-top:6px;background:' + ({ sh: '#F7CE2E', mk: '#2E9E6E', ms: '#6B5FD3', mo: '#9E9E9E' }[x.c] || '#9E9E9E') + '"></i><span>' + esc(x.l) + '</span></div>'; }).join('') : '<p class="muted" style="margin-top:8px">予定はありません</p>')
+      + '<p class="muted" style="font-size:12px;margin-top:6px">予定を押すと、変更・削除できます。</p>'
+      + '<div class="acts"><button class="btn yel" id="cmAdd">＋ 追加</button><div class="r"><button class="btn" onclick="closeModal()">閉じる</button><button class="btn pri" id="cmToWeek">週の予定で開く</button></div></div>');
+    [].forEach.call(document.querySelectorAll('#sheet [data-mi]'), function(row){ row.onclick = function(){ calEdit(it[+row.dataset.mi]); }; });
+    document.getElementById('cmAdd').onclick = function(){ addChoice(d); };
     document.getElementById('cmToWeek').onclick = function(){ closeModal(); weekFrom = d; showPanel('week'); load(); };
   });
 
