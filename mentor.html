@@ -657,7 +657,7 @@
   function toast(t){ var el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function(){ el.classList.remove('on'); }, 2400); }
   function save(action, data, msg, btn){
     if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
-    return api(action, data).then(function(r){ closeModal(); toast(msg || '保存しました'); if (r && r.notice) setTimeout(function(){ alert(r.notice); }, 60); if (document.getElementById('p-cal').classList.contains('on')) calLoad(); return load(); })
+    return api(action, data).then(function(r){ closeModal(); toast(msg || '保存しました'); if (r && r.notice) setTimeout(function(){ alert(r.notice); }, 60); if (document.getElementById('p-cal').classList.contains('on')) calLoad(); if (document.getElementById('p-room').classList.contains('on')) loadRoom(); return load(); })
       .catch(function(e){ toast(e.message); if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || '保存'; } });
   }
   function confirmDel(text, action, data){
@@ -1157,7 +1157,8 @@
       return '<div class="card" style="padding:10px 14px;margin-bottom:6px"><div class="row"><div style="display:flex;align-items:center;gap:8px;min-width:0">'
         + (s.kind ? '<span class="tag" style="margin-left:0;background:' + (RMC[k] || '#888') + ';color:#fff">' + esc(k) + '</span>' : '')
         + '<b>' + esc(s.name) + '</b><span class="muted">' + esc(s.grade || '') + '</span></div>'
-        + '<span class="muted" style="white-space:nowrap;text-align:right">' + (s.since ? esc(s.since) + ' 入室' : '') + (st ? '<br>' + st : '') + '</span></div></div>';
+        + '<span class="muted" style="white-space:nowrap;text-align:right">' + (s.since ? esc(s.since) + ' 入室' : '') + (st ? '<br>' + st : '') + '</span></div>'
+        + '<div style="text-align:right;margin-top:6px"><button class="btn" data-ao="s" data-id="' + esc(s.sid) + '" data-date="' + esc(RMD.today) + '" data-in="' + esc(s.since || '') + '" data-name="' + esc(s.name) + '">帰った（退室を記録）</button></div></div>';
     }).join('') : '<div class="card muted">いま在室中の生徒はいません</div>';
     document.getElementById('rmList').innerHTML = h;
   }
@@ -1203,9 +1204,10 @@
     }).join('') : '<p class="muted">退勤の記録漏れはありません</p>';
     document.getElementById('attFix').innerHTML = h;
   }
-  document.getElementById('attFix').addEventListener('click', function(ev){
+  // 退室・退勤を記録（出勤QRタブの「QRの打ち忘れ」と、在室タブから使う）
+  function aoOpen(ev){
     var b = ev.target.closest('button[data-ao]'); if (!b) return;
-    var isS = b.dataset.ao === 's', td = b.dataset.date === ATT.today;
+    var isS = b.dataset.ao === 's', td = b.dataset.date === (ATT ? ATT.today : RMD.today);
     var now = new Date(), nowHm = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
     openModal('<h3>' + (isS ? '退室を記録' : '退勤を記録') + '</h3><p><b>' + esc(b.dataset.name) + 'さん</b></p>'
       + '<p class="muted">' + label(b.dataset.date) + (b.dataset.in ? ' ' + b.dataset.in + (isS ? ' 入室' : ' 出勤') : '') + '</p>'
@@ -1219,7 +1221,9 @@
         isS ? { sid: b.dataset.id, date: b.dataset.date, time: val('aoT'), notify: !!(n && n.checked) } : { mentorId: b.dataset.id, date: b.dataset.date, time: val('aoT') },
         isS ? '退室を記録しました' : '退勤を記録しました', this);
     };
-  });
+  }
+  document.getElementById('attFix').addEventListener('click', aoOpen);
+  document.getElementById('rmList').addEventListener('click', aoOpen);
 
   // ===== 授業依頼 =====
   var R = null;
