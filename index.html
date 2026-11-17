@@ -136,6 +136,8 @@
   @media (orientation:portrait){.wrap{gap:2vh;padding:2.5vh 5vw 5vh}.cam{width:min(100%,40vh);max-height:40vh}.guide{margin-top:2vh}.board{height:clamp(80px,14vh,170px)}}
 
   /* おうちの人からの伝言 */
+@keyframes msgflash{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+#msgBtnR.flash{animation:msgflash .8s ease-in-out 6}
   .inbox{display:none;flex-direction:column;gap:1vh;margin-top:2.2vh}
   .inbox.show{display:flex}
   .cam .inbox{position:absolute;top:2vh;left:2vh;right:2vh;margin-top:0;z-index:3}
@@ -706,9 +708,24 @@ function onCode(text){
       .then(function(d){ if (d && d.ok) renderInbox(d.list || []); })
       .catch(function(){});
   }
+  var INBOX_N = null;
+  function inboxAlert(){
+    beep(880, .16); beep(1175, .16, .2); beep(1568, .4, .4);
+    try {
+      if (!window.speechSynthesis) return;
+      var u = new SpeechSynthesisUtterance('おうちの人から、メッセージが届きました');
+      u.lang = 'ja-JP'; u.rate = 1; u.volume = 1;
+      setTimeout(function(){ speechSynthesis.cancel(); speechSynthesis.speak(u); }, 900);
+    } catch(e){}
+    var b = document.getElementById('msgBtnR');
+    if (b) { b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash'); setTimeout(function(){ b.classList.remove('flash'); }, 6000); }
+  }
   function renderInbox(list){
     INBOX = list || [];
     var n = 0; INBOX.forEach(function(x){ n += x.count || 1; });
+    // 新しい伝言が届いたら、音と声でお知らせ（開いた直後の1回目は鳴らさない）
+    if (INBOX_N !== null && n > INBOX_N) inboxAlert();
+    INBOX_N = n;
     var b = document.getElementById('msgBtnR');
     if (b) {
       b.classList.toggle('has', n > 0);
@@ -815,7 +832,7 @@ function onCode(text){
   ['msgBtn','msgBtnS','msgBtnK','guestBtn'].forEach(function(id){ var b = document.getElementById(id); if (b) b.addEventListener('click', function(){ if (inMode) inboxEnd(); }); });
   document.getElementById('msgBtnR').onclick = pickOpen;
   document.getElementById('iPickClose').onclick = pickClose;
-  loadInbox(); setInterval(loadInbox, 60000);
+  loadInbox(); setInterval(loadInbox, 30000);
   // ゲスト：QRコードなしで、撮影ボタンで受付
   document.getElementById('gBarShot').onclick = function(){ if (guestMode && !busy) guestCode('SUBSC:GUEST'); };
 </script>
