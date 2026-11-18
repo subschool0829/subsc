@@ -107,7 +107,7 @@
   <div class="side">
     <div class="clock" id="clock">--:--</div>
     <div class="date" id="date"></div>
-    <div class="guide">ボタンを押して<br>名前をえらんでね<small>スタッフはQRカードをかざしてください</small></div>
+    <div class="guide">ボタンを押して<br>名前をえらんでね<small>スタッフも名前でOK（QRカードも使えます）</small></div>
     <button class="namebtn" id="nameBtn" type="button">✋ 名前で入室・退室</button>
   </div>
 </div>
@@ -346,9 +346,9 @@ function onCode(text){
     var q = nNorm((document.getElementById('nQ') || {}).value);
     var list = KIDS.filter(function(k){ return (N.act === 'out' || !k.guest) && (!q || nNorm(k.name).indexOf(q) >= 0 || nNorm(k.kana).indexOf(q) >= 0); });
     if (N.act === 'out' && !q) list = list.filter(function(k){ return k.in; });
-    list.sort(function(a, b){ return nNorm(a.kana || a.name) < nNorm(b.kana || b.name) ? -1 : 1; });
+    list.sort(function(a, b){ if (!!a.staff !== !!b.staff) return a.staff ? 1 : -1; return nNorm(a.kana || a.name) < nNorm(b.kana || b.name) ? -1 : 1; });
     el.innerHTML = list.length ? list.map(function(k){
-      return '<button type="button" class="' + (k.in ? 'here' : '') + '" data-no="' + nEsc(k.no) + '" data-name="' + nEsc(k.name) + '">' + nEsc(k.name)
+      return '<button type="button" class="' + (k.in ? 'here' : '') + '" data-no="' + nEsc(k.no) + '" data-name="' + nEsc(k.name) + '" data-staff="' + (k.staff ? 1 : '') + '">' + nEsc(k.name)
         + '<small>' + nEsc(k.school || '') + (k.in ? '　🟢 いま入室中' : '') + '</small></button>';
     }).join('') : '<p class="gnote">' + (N.act === 'out' && !q ? 'いま入室中の人はいません。上に名前を入れてさがしてね' : 'みつかりません') + '</p>';
     if (N.act === 'in') el.innerHTML += '<button type="button" class="gst" data-guest>名前がない（はじめての人・登録がまだの人）</button>';
@@ -380,9 +380,9 @@ function onCode(text){
     var n = N;
     nBarEnd();
     busy = true; beep(880, .12);
-    show('wait', 'そのまま カメラを見てね', '', '', '', true);
+    show('wait', n.staff ? '受付しています' : 'そのまま カメラを見てね', '', '', '', true);
     setTimeout(function(){
-      var photo = capture();
+      var photo = n.staff ? '' : capture();
       document.getElementById('oMsg').textContent = '送信中…';
       var body = n.guest ? { action:'guest_checkin', key:KEY, act:n.act, name:n.name, grade:n.grade, gid:n.no, photo:photo } : { action:'checkin_name', key:KEY, no:n.no, act:n.act, photo:photo };
       fetch(GAS_URL, { method:'POST', body: JSON.stringify(body) })
@@ -397,7 +397,7 @@ function onCode(text){
           } else result(r);
         })
         .catch(function(){ N = null; beep(220, .3); show('err', '通信できませんでした', '', 'もう一度ためしてください', ''); setTimeout(reset, 3000); });
-    }, 1400);
+    }, n.staff ? 200 : 1400);
   }
   document.getElementById('nameBtn').onclick = nStart;
   document.getElementById('gBarShot').onclick = nShoot;
@@ -410,7 +410,7 @@ function onCode(text){
     if (b.hasAttribute('data-guest')) return nGuest();
     if (b.dataset.grade) { N.grade = b.dataset.grade; [].forEach.call(document.querySelectorAll('.grades button'), function(x){ x.className = x === b ? 'on' : ''; }); return nGuestChk(); }
     if (b.id === 'gNext') { N.name = document.getElementById('gSei').value.trim() + ' ' + document.getElementById('gMei').value.trim(); return nCamera(); }
-    if (b.dataset.no) { N.no = b.dataset.no; N.name = b.dataset.name; N.guest = /^G/.test(N.no); return nCamera(); }
+    if (b.dataset.no) { N.no = b.dataset.no; N.name = b.dataset.name; N.guest = /^G/.test(N.no); N.staff = !!b.dataset.staff; if (N.staff) { nCamera(); return nShoot(); } return nCamera(); }
   });
 </script>
 </body>
