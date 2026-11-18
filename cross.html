@@ -94,6 +94,19 @@
   .gpanel .two{display:grid;grid-template-columns:1fr 1fr;gap:2vw;width:100%;max-width:900px}
   .gpanel .row button.next{background:var(--in);border-color:var(--in);color:#fff}
   .gpanel .row button:disabled{opacity:.4}
+  .msgbtns{display:flex;flex-wrap:wrap;gap:1.2vw;margin-top:2.4vh}
+  .msgbtn{font:inherit;font-weight:900;font-size:clamp(14px,1.8vw,22px);color:var(--ink);background:#fff;border:3px solid var(--ink);border-radius:999px;padding:1.3vh 2.2vw;cursor:pointer}
+  .msgbtn:active{transform:translateY(2px)}
+  .msgbtn .rc{display:none;margin-left:.5em;background:var(--err);color:#fff;border-radius:999px;padding:0 .6em}
+  .msgbtn.has{border-color:var(--out);background:#FFF4D6}.msgbtn.has .rc{display:inline-block}
+  @keyframes msgflash{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  .msgbtn.flash{animation:msgflash .8s ease-in-out 6}
+  .gpanel textarea{width:100%;max-width:900px;height:26vh;font:inherit;font-size:clamp(18px,2.4vw,28px);font-weight:700;padding:2vh 2vw;border:3px solid var(--ink);border-radius:20px;resize:none;background:#fff;color:var(--ink)}
+  .gpanel .msgs{width:100%;max-width:900px;display:flex;flex-direction:column;gap:1.4vh}
+  .gpanel .msgs div{background:#fff;border-radius:18px;padding:1.8vh 2vw;border:3px solid var(--out)}
+  .gpanel .msgs div.read{border-color:#ccc;opacity:.8}
+  .gpanel .msgs small{display:block;color:var(--sub);font-weight:700;font-size:clamp(13px,1.6vw,18px)}
+  .gpanel .msgs p{font-size:clamp(20px,2.6vw,32px);font-weight:700;line-height:1.5;white-space:pre-wrap}
   .gbar button.shot{background:var(--in);color:#fff;font-size:clamp(24px,3.4vw,42px);padding:1.6vh 6vw}
 </style>
 </head>
@@ -109,6 +122,7 @@
     <div class="date" id="date"></div>
     <div class="guide">ボタンを押して<br>名前をえらんでね<small>スタッフも名前でOK（QRカードも使えます）</small></div>
     <button class="namebtn" id="nameBtn" type="button">✋ 名前で入室・退室</button>
+    <div class="msgbtns"><button class="msgbtn" id="msgBtn" type="button">✉ おうちの人にメッセージ</button><button class="msgbtn" id="msgBtnR" type="button">📩 おうちの人からの伝言<span class="rc" id="msgBtnRc">0</span></button></div>
   </div>
 </div>
 <div class="brand">外日角クロス</div>
@@ -317,7 +331,7 @@ function onCode(text){
   function nPanel(html){ var p = document.getElementById('gPanel'); p.innerHTML = html; p.classList.add('show'); clearTimeout(nIdle); nIdle = setTimeout(nCancel, 90000); }
   function nClose(){ document.getElementById('gPanel').classList.remove('show'); clearTimeout(nIdle); var a = document.activeElement; if (a && a.blur) a.blur(); }
   function nBarEnd(){ nameMode = false; clearTimeout(nTimer); document.getElementById('gBar').classList.remove('show'); }
-  function nCancel(){ nClose(); nBarEnd(); N = null; busy = false; lastText = ''; }
+  function nCancel(){ nClose(); nBarEnd(); N = null; M = null; busy = false; lastText = ''; }
   function loadKids(cb){
     fetch(GAS_URL, { method:'POST', body: JSON.stringify({ action:'kids_list', key:KEY }) })
       .then(function(r){ return r.json(); })
@@ -412,6 +426,106 @@ function onCode(text){
     if (b.id === 'gNext') { N.name = document.getElementById('gSei').value.trim() + ' ' + document.getElementById('gMei').value.trim(); return nCamera(); }
     if (b.dataset.no) { N.no = b.dataset.no; N.name = b.dataset.name; N.guest = /^G/.test(N.no); N.staff = !!b.dataset.staff; if (N.staff) { nCamera(); return nShoot(); } return nCamera(); }
   });
+  // ===== おうちの人との伝言（サブスクのタブレットと同じ形。QRのかわりに名前で） =====
+  var M = null, INBOX = [], INBOX_N = null;
+  function mPost(o){ o.key = KEY; return fetch(GAS_URL, { method:'POST', body: JSON.stringify(o) }).then(function(r){ return r.json(); }); }
+  function mEnd(){ nClose(); M = null; busy = false; lastText = ''; }
+  function mSendStart(){
+    if (busy) return;
+    busy = true; M = { mode:'send' };
+    nPanel('<h2>おうちの人にメッセージ：自分の名前をえらんでね</h2><input id="nQ" placeholder="名前の さいしょの文字（ひらがなでもOK）" autocomplete="off"><div class="glist" id="mList"><p class="gnote">読み込み中…</p></div><div class="row"><button type="button" data-mcancel>やめる</button></div>');
+    document.getElementById('nQ').addEventListener('input', function(){ clearTimeout(nIdle); nIdle = setTimeout(nCancel, 90000); mRender(); });
+    loadKids(mRender);
+  }
+  function mRender(){
+    var el = document.getElementById('mList'); if (!el) return;
+    if (!KIDS) { el.innerHTML = '<p class="gnote">名前を読みこめませんでした。スタッフに声をかけてね</p>'; return; }
+    var q = nNorm((document.getElementById('nQ') || {}).value);
+    var list = KIDS.filter(function(k){ return !k.staff && !k.guest && (q ? (nNorm(k.name).indexOf(q) >= 0 || nNorm(k.kana).indexOf(q) >= 0) : k.in); });
+    list.sort(function(a, b){ return nNorm(a.kana || a.name) < nNorm(b.kana || b.name) ? -1 : 1; });
+    el.innerHTML = list.length ? list.map(function(k){ return '<button type="button" data-mno="' + nEsc(k.no) + '" data-mname="' + nEsc(k.name) + '">' + nEsc(k.name) + '<small>' + nEsc(k.school || '') + '</small></button>'; }).join('')
+      : '<p class="gnote">' + (q ? 'みつかりません' : 'いま入室中の人はいません。上に名前を入れてさがしてね') + '</p>';
+  }
+  function mCompose(){
+    nPanel('<h2>' + nEsc(M.name) + 'さんから、おうちの人にメッセージを送ります</h2><textarea id="mText" maxlength="300" placeholder="ここにメッセージを書いてね"></textarea>'
+      + '<div class="row"><span class="gnote" id="mCnt" style="margin-right:auto">0 / 300</span><button type="button" data-mcancel>やめる</button><button type="button" class="next" id="mSend" disabled>送信</button></div>');
+    var ta = document.getElementById('mText');
+    ta.addEventListener('input', function(){ clearTimeout(nIdle); nIdle = setTimeout(nCancel, 90000); document.getElementById('mCnt').textContent = ta.value.length + ' / 300'; document.getElementById('mSend').disabled = !ta.value.trim(); });
+    setTimeout(function(){ ta.focus(); }, 100);
+  }
+  function mSend(){
+    var text = document.getElementById('mText').value.trim(); if (!text) return;
+    var m = M; nClose(); M = null;
+    show('wait', '送信中…', '', '', '', true);
+    mPost({ action:'kid_msg', no:m.no, text:text }).then(function(r){
+      if (r && r.ok && !r.noParent) { chime(true); show('in', '送りました', (r.name || m.name) + 'さん', 'おうちの人に届けました', r.failed ? '※うまく届かなかったかもしれません。スタッフに声をかけてね' : ''); }
+      else if (r && r.ok) { beep(660, .2); show('err', 'おうちの人のLINE登録がまだです', (r.name || m.name) + 'さん', 'メッセージは届いていません', 'スタッフに声をかけてね'); }
+      else { beep(220, .3); show('err', (r && r.message) || '送れませんでした', '', 'スタッフに声をかけてね', ''); }
+    }).catch(function(){ beep(220, .3); show('err', '通信できませんでした', '', 'もう一度ためしてね', ''); })
+      .then(function(){ setTimeout(reset, 3500); });
+  }
+  function loadInbox(){
+    if (!KEY) return;
+    mPost({ action:'inbox' }).then(function(d){ if (d && d.ok) renderInbox(d.list || []); }).catch(function(){});
+  }
+  function inboxAlert(){
+    beep(880, .16); beep(1175, .16, .2); beep(1568, .4, .4);
+    try {
+      if (window.speechSynthesis) {
+        var u = new SpeechSynthesisUtterance('おうちの人から、伝言が届きました');
+        u.lang = 'ja-JP';
+        setTimeout(function(){ speechSynthesis.cancel(); speechSynthesis.speak(u); }, 900);
+      }
+    } catch(e){}
+    var b = document.getElementById('msgBtnR');
+    b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash'); setTimeout(function(){ b.classList.remove('flash'); }, 6000);
+  }
+  function renderInbox(list){
+    INBOX = list; var n = 0; list.forEach(function(x){ n += x.count || 1; });
+    if (INBOX_N !== null && n > INBOX_N) inboxAlert();
+    INBOX_N = n;
+    var b = document.getElementById('msgBtnR'); b.classList.toggle('has', n > 0);
+    document.getElementById('msgBtnRc').textContent = n;
+  }
+  function mReadStart(){
+    if (busy) return;
+    busy = true; M = { mode:'read' };
+    nPanel('<h2>おうちの人からの伝言</h2><p class="gnote">' + (INBOX.length ? '自分の名前をタップしてね' : 'いま届いている伝言はありません') + '</p><div class="glist">'
+      + INBOX.map(function(x){ return '<button type="button" data-rno="' + nEsc(x.no) + '">' + nEsc(x.name) + 'さん<small>' + x.count + '件</small></button>'; }).join('')
+      + '</div><div class="row"><button type="button" data-mcancel>とじる</button></div>');
+    loadInbox();
+  }
+  function mOpen(no){
+    nClose(); show('wait', '伝言を開いています…', '', '', '', true);
+    mPost({ action:'inbox_read', no:no }).then(function(d){
+      if (!d || !d.ok) { show('err', (d && d.message) || '開けませんでした', '', '', ''); setTimeout(function(){ M = null; reset(); loadInbox(); }, 2500); return; }
+      document.getElementById('overlay').className = 'overlay';
+      M = { mode:'read', no:no, name:d.name, ids:d.list.filter(function(x){ return !x.read; }).map(function(x){ return x.id; }) };
+      nPanel('<h2>' + nEsc(d.name) + 'さんへ　おうちの人からの伝言</h2><div class="msgs">'
+        + d.list.map(function(x){ return '<div class="' + (x.read ? 'read' : '') + '"><small>' + nEsc((x.from ? x.from + '　' : '') + x.at + (x.read ? '（読んだ伝言）' : '')) + '</small><p>' + nEsc(x.body) + '</p></div>'; }).join('')
+        + '</div><div class="row"><button type="button" data-mcancel>とじる</button>' + (M.ids.length ? '<button type="button" class="next" id="mAck">読みました</button>' : '') + '</div>');
+    }).catch(function(){ show('err', '通信できませんでした', '', 'もう一度ためしてね', ''); setTimeout(function(){ M = null; reset(); }, 2500); });
+  }
+  function mAck(){
+    var m = M; nClose(); M = null;
+    show('wait', '送信中…', '', '', '', true);
+    mPost({ action:'inbox_ack', no:m.no, ids:m.ids }).then(function(d){
+      if (d && d.ok) { beep(1040, .15); show('in', 'おうちの人に「読みました」と知らせました', m.name + 'さん', '', ''); }
+      else show('err', (d && d.message) || '送れませんでした', '', 'もう一度ためしてね', '');
+    }).catch(function(){ show('err', '通信できませんでした', '', 'もう一度ためしてね', ''); })
+      .then(function(){ setTimeout(function(){ reset(); loadInbox(); }, 3000); });
+  }
+  document.getElementById('gPanel').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (!b || !M) return;
+    if (b.hasAttribute('data-mcancel')) { nClose(); M = null; busy = false; lastText = ''; loadInbox(); return; }
+    if (b.dataset.mno) { M.no = b.dataset.mno; M.name = b.dataset.mname; return mCompose(); }
+    if (b.id === 'mSend') return mSend();
+    if (b.dataset.rno) return mOpen(b.dataset.rno);
+    if (b.id === 'mAck') return mAck();
+  });
+  document.getElementById('msgBtn').onclick = mSendStart;
+  document.getElementById('msgBtnR').onclick = mReadStart;
+  loadInbox(); setInterval(loadInbox, 30000);
 </script>
 </body>
 </html>
