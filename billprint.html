@@ -79,6 +79,8 @@
     .page .iss{margin-top:3mm;padding-top:2mm}
     .page .draft{top:0;right:4mm}
   }
+  #pBtn[disabled]{opacity:.45;cursor:default}
+  @media print { body.empty .msg { display: block !important; } }
 </style>
 </head>
 <body>
@@ -87,7 +89,7 @@
   <label>発行日 <input type="date" id="issue"></label>
   <label><input type="checkbox" id="showDraft">下書きも表示（確認用）</label>
   <span id="cnt" style="font-size:13px;color:var(--sub)"></span>
-  <button class="btn" onclick="window.print()">印刷する</button>
+  <button class="btn" id="pBtn" onclick="window.print()" disabled>読み込み中…</button>
 </div>
 <div class="msg" id="boot">読み込み中…</div>
 <div id="pages"></div>
@@ -169,6 +171,9 @@
     document.getElementById('pages').innerHTML = list.map(function(b){ return invoicePage(b) + guidePage(b); }).join('');
     [].forEach.call(document.querySelectorAll('[data-qr]'), function(el){ qr(el, el.dataset.qr); });
     document.getElementById('boot').hidden = !!list.length;
+    var pb = document.getElementById('pBtn'); pb.disabled = !list.length; pb.textContent = list.length ? '印刷する' : '印刷するものがありません';
+    document.body.classList.toggle('empty', !list.length);
+    if (!list.length && UNSENT) document.getElementById('boot').textContent = '未送付の請求書はありません（確定済みで、LINE・メールで送っていないものだけが出ます）。';
     if (!list.length) document.getElementById('boot').textContent = '確定した請求がありません。請求の画面で確定してから開いてください（「下書きも表示」で中身の確認はできます）。';
   }
   document.getElementById('issue').value = today();
