@@ -1536,8 +1536,8 @@
   function billAct(action, data, msg){
     return api(action, Object.assign({ month: billMonth }, data || {})).then(function(r){ if (msg) toast(typeof msg === 'function' ? msg(r) : msg); return loadBill(); }).catch(function(e){ toast(e.message); });
   }
-  document.getElementById('bPaper').onclick = function(){ window.open('billprint.html#' + billMonth, '_blank'); };
-  document.getElementById('bPaperUnsent').onclick = function(){ window.open('billprint.html#' + billMonth + '&unsent=1', '_blank'); };
+  document.getElementById('bPaper').onclick = function(){ window.open('billprint.html?v=' + Date.now() + '#' + billMonth, '_blank'); };
+  document.getElementById('bPaperUnsent').onclick = function(){ window.open('billprint.html?v=' + Date.now() + '#' + billMonth + '&unsent=1', '_blank'); };
   // 請求する生徒を追加（ビジター・休会中・体験など、下書きに出てこない生徒にも請求できる）
   document.getElementById('bAddStu').onclick = function(){
     var p = billMonth.split('-');
